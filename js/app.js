@@ -20,9 +20,14 @@
   function profile() { return SH.Profile.get(); }
   function stage() { var p = profile(); return p ? p.stageIndex : 2; }
 
+  var COURSE_KEY = 'studyhub.course';
+
   function go(view, subjectId) {
     state.view = view;
-    if (subjectId) state.subjectId = subjectId;
+    if (subjectId) {
+      state.subjectId = subjectId;
+      try { localStorage.setItem(COURSE_KEY, subjectId); } catch (e) {}
+    }
     render();
   }
   SH.go = go;
@@ -160,7 +165,7 @@
       body.appendChild(el('div', null, s.name + (s.native ? '  ' + s.native : '')));
       body.appendChild(el('span', 'tile-sub', s.blurb));
       t.appendChild(body);
-      t.onclick = function () { state.subjectId = s.id; go('path'); };
+      t.onclick = function () { go('path', s.id); };
       list.appendChild(t);
     });
     box.appendChild(list);
@@ -465,6 +470,10 @@
     hudEl = document.getElementById('hud');
     appEl = document.getElementById('app');
     SH.Theme.init();
+    try {
+      var saved = localStorage.getItem(COURSE_KEY);
+      if (saved && SH.subject(saved)) state.subjectId = saved;
+    } catch (e) {}
     if (!profile()) { state.view = 'onboard'; state.onboardStep = 0; }
     render();
   });

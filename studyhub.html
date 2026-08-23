@@ -1,0 +1,3051 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>StudyHub — English · Math · Science · Chinese</title>
+<meta name="description" content="Bite-sized lessons in English, Math, Science and Chinese, matched to your age and school year.">
+<style>
+/* ============================================================
+   StudyHub — a lesson-path study app for English, Math,
+   Science and Chinese. Chunky, playful, keyboard friendly.
+   ============================================================ */
+
+:root {
+  --green: #58cc02;
+  --green-dark: #46a302;
+  --green-tint: #d7ffb8;
+  --blue: #1cb0f6;
+  --blue-dark: #1899d6;
+  --blue-tint: #ddf4ff;
+  --red: #ff4b4b;
+  --red-dark: #ea2b2b;
+  --red-tint: #ffdfe0;
+  --yellow: #ffc800;
+  --yellow-dark: #e6a400;
+  --orange: #ff9600;
+  --purple: #ce82ff;
+
+  --bg: #ffffff;
+  --card: #ffffff;
+  --sunk: #f7f7f7;
+  --line: #e5e5e5;
+  --line-strong: #d4d4d4;
+  --text: #3c3c3c;
+  --text-dim: #afafaf;
+
+  --english: #1cb0f6;
+  --math: #ff9600;
+  --science: #58cc02;
+  --chinese: #ff4b4b;
+
+  --radius: 16px;
+  /* system rounded stack: no network fetch, so the app works fully offline */
+  --font: ui-rounded, "SF Pro Rounded", "Segoe UI Variable Display", "Segoe UI",
+          system-ui, -apple-system, Roboto, "Noto Sans SC", "PingFang SC",
+          "Microsoft YaHei", sans-serif;
+}
+
+:root[data-theme="dark"] {
+  --bg: #131f24;
+  --card: #1b2b32;
+  --sunk: #202f36;
+  --line: #37464f;
+  --line-strong: #46565f;
+  --text: #f1f7fb;
+  --text-dim: #7f97a3;
+  --green-tint: #202f1a;
+  --red-tint: #331c1f;
+  --blue-tint: #17323f;
+}
+
+* { box-sizing: border-box; }
+html, body { height: 100%; }
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--font);
+  font-size: 16px;
+  font-weight: 700;
+  line-height: 1.5;
+  -webkit-text-size-adjust: 100%;
+  -webkit-tap-highlight-color: transparent;
+}
+h1, h2, h3 { margin: 0; font-weight: 800; letter-spacing: -.02em; }
+button { font-family: inherit; }
+
+/* ---------------- chunky buttons ---------------- */
+.btn {
+  display: inline-flex; align-items: center; justify-content: center; gap: 8px;
+  border: 0; border-radius: var(--radius);
+  padding: 14px 22px; min-height: 50px;
+  font-size: .95rem; font-weight: 800; letter-spacing: .8px; text-transform: uppercase;
+  color: #fff; background: var(--green);
+  box-shadow: 0 4px 0 var(--green-dark);
+  cursor: pointer; user-select: none;
+  transition: filter .1s ease;
+}
+.btn:hover { filter: brightness(1.06); }
+.btn:active { transform: translateY(4px); box-shadow: none; }
+.btn--blue { background: var(--blue); box-shadow: 0 4px 0 var(--blue-dark); }
+.btn--red { background: var(--red); box-shadow: 0 4px 0 var(--red-dark); }
+.btn--ghost {
+  background: transparent; color: var(--text-dim);
+  border: 2px solid var(--line); border-bottom-width: 4px; box-shadow: none;
+}
+.btn--ghost:active { transform: translateY(2px); border-bottom-width: 2px; }
+.btn[disabled] {
+  background: var(--line); color: var(--text-dim); box-shadow: none;
+  cursor: not-allowed; filter: none;
+}
+.btn[disabled]:active { transform: none; }
+.btn--wide { width: 100%; }
+
+.link {
+  background: none; border: 0; padding: 0; cursor: pointer;
+  color: var(--blue); font-weight: 800; font-size: .88rem;
+  text-transform: uppercase; letter-spacing: .6px;
+}
+.link:hover { filter: brightness(1.1); }
+
+/* ---------------- top HUD ---------------- */
+.hud {
+  position: sticky; top: 0; z-index: 30;
+  display: flex; align-items: center; gap: 10px;
+  padding: 12px 18px;
+  background: var(--bg);
+  border-bottom: 2px solid var(--line);
+}
+.hud .brand {
+  display: flex; align-items: center; gap: 8px;
+  background: none; border: 0; cursor: pointer; padding: 0;
+  color: var(--green); font-size: 1.15rem; font-weight: 800; letter-spacing: -.02em;
+}
+.hud-spacer { flex: 1; }
+.stat-pill {
+  display: inline-flex; align-items: center; gap: 5px;
+  font-size: 1rem; font-weight: 800; color: var(--text-dim);
+  background: none; border: 0; padding: 4px 6px; border-radius: 10px; cursor: default;
+}
+.stat-pill.fire { color: var(--orange); }
+.stat-pill.gem { color: var(--blue); }
+.stat-pill.heart { color: var(--red); }
+.stat-pill.dim { color: var(--text-dim); }
+.icon-btn {
+  background: none; border: 0; cursor: pointer; font-size: 1.1rem;
+  padding: 6px 8px; border-radius: 10px; color: var(--text-dim);
+}
+.icon-btn:hover { background: var(--sunk); }
+
+/* ---------------- layout ---------------- */
+.wrap { max-width: 640px; margin: 0 auto; padding: 22px 18px 90px; }
+.wrap--wide { max-width: 860px; }
+.center { text-align: center; }
+.muted { color: var(--text-dim); font-weight: 700; }
+.small { font-size: .85rem; }
+
+/* ---------------- onboarding ---------------- */
+.onboard {
+  min-height: calc(100vh - 0px);
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  padding: 40px 20px 60px; gap: 8px; text-align: center;
+}
+.mascot { font-size: 4.5rem; line-height: 1; margin-bottom: 6px; }
+.onboard h1 { font-size: 1.7rem; margin-bottom: 6px; }
+.onboard p { color: var(--text-dim); margin: 0 0 24px; max-width: 420px; }
+.speech {
+  position: relative; background: var(--sunk); border: 2px solid var(--line);
+  border-radius: 14px; padding: 12px 16px; max-width: 380px; margin: 0 auto 26px;
+  font-weight: 700; color: var(--text);
+}
+.speech::after {
+  content: ''; position: absolute; left: 50%; bottom: -10px; transform: translateX(-50%);
+  border: 9px solid transparent; border-top-color: var(--line); border-bottom: 0;
+}
+.age-grid {
+  display: grid; gap: 10px; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  width: 100%; max-width: 440px; margin-bottom: 20px;
+}
+.age-input {
+  display: flex; gap: 10px; width: 100%; max-width: 320px; margin: 0 auto 18px;
+}
+.age-input input {
+  flex: 1; min-width: 0; text-align: center;
+  font: inherit; font-size: 1.4rem; font-weight: 800;
+  padding: 12px; border-radius: 14px;
+  border: 2px solid var(--line); border-bottom-width: 4px;
+  background: var(--bg); color: var(--text);
+}
+.age-input input:focus { outline: none; border-color: var(--blue); }
+.step-dots { display: flex; gap: 6px; justify-content: center; margin-bottom: 22px; }
+.step-dots i { width: 8px; height: 8px; border-radius: 50%; background: var(--line); }
+.step-dots i.on { background: var(--green); }
+
+/* option tiles (onboarding + course picker) */
+.tile {
+  display: flex; align-items: center; gap: 12px; width: 100%;
+  background: var(--card); color: var(--text);
+  border: 2px solid var(--line); border-bottom-width: 4px; border-radius: var(--radius);
+  padding: 14px 16px; cursor: pointer; text-align: left; font-weight: 800;
+}
+.tile:hover { background: var(--sunk); }
+.tile.sel { border-color: var(--blue); background: var(--blue-tint); color: var(--blue-dark); }
+.tile .emoji { font-size: 1.6rem; }
+.tile .tile-sub { display: block; font-size: .8rem; font-weight: 700; color: var(--text-dim); }
+.tile.sel .tile-sub { color: var(--blue-dark); }
+
+/* ---------------- course switcher ---------------- */
+.courses { display: flex; gap: 8px; overflow-x: auto; padding: 14px 18px 4px; max-width: 640px; margin: 0 auto; }
+.course-chip {
+  flex: none; display: flex; align-items: center; gap: 7px;
+  border: 2px solid var(--line); border-bottom-width: 4px; border-radius: 14px;
+  background: var(--card); color: var(--text-dim);
+  padding: 8px 13px; cursor: pointer; font-weight: 800; font-size: .88rem;
+}
+.course-chip .emoji { font-size: 1.1rem; }
+.course-chip.on { border-color: currentColor; background: var(--sunk); }
+
+/* ---------------- learning path ---------------- */
+.unit {
+  background: var(--sub, var(--green));
+  border-radius: var(--radius);
+  color: #fff; padding: 14px 18px; margin: 22px 0 6px;
+  display: flex; align-items: center; justify-content: space-between; gap: 12px;
+  box-shadow: 0 4px 0 rgba(0,0,0,.18);
+}
+.unit-title { font-size: 1.05rem; font-weight: 800; }
+.unit-sub { font-size: .8rem; font-weight: 700; opacity: .9; }
+.unit-crowns { font-size: .95rem; font-weight: 800; white-space: nowrap; }
+
+.path { display: flex; flex-direction: column; align-items: center; gap: 14px; padding: 18px 0 6px; }
+.path-row { display: flex; justify-content: center; width: 100%; }
+.node {
+  position: relative;
+  width: 72px; height: 66px; border: 0; border-radius: 50%;
+  background: var(--sub, var(--green));
+  box-shadow: 0 6px 0 rgba(0,0,0,.22);
+  color: #fff; font-size: 1.5rem; cursor: pointer;
+  display: grid; place-items: center;
+}
+.node:active { transform: translateY(5px); box-shadow: 0 1px 0 rgba(0,0,0,.22); }
+.node.locked { background: var(--line); box-shadow: 0 6px 0 var(--line-strong); color: var(--text-dim); }
+.node.done { background: var(--yellow); box-shadow: 0 6px 0 var(--yellow-dark); }
+.node.current::before {
+  content: ''; position: absolute; inset: -7px; border-radius: 50%;
+  border: 4px solid var(--sub, var(--green)); opacity: .35;
+}
+.node-flag {
+  position: absolute; top: -34px; left: 50%; transform: translateX(-50%);
+  background: var(--card); color: var(--sub, var(--green));
+  border: 2px solid var(--line); border-bottom-width: 3px; border-radius: 10px;
+  padding: 3px 10px; font-size: .68rem; font-weight: 800; letter-spacing: .8px;
+  text-transform: uppercase; white-space: nowrap;
+}
+.path-note { text-align: center; color: var(--text-dim); font-size: .82rem; margin-top: 4px; }
+
+.section-head { display: flex; align-items: center; justify-content: space-between; margin: 30px 0 10px; gap: 10px; }
+.section-head h2 { font-size: 1.05rem; }
+
+/* daily goal card */
+.goal-card {
+  display: flex; align-items: center; gap: 14px;
+  border: 2px solid var(--line); border-radius: var(--radius);
+  padding: 14px 16px; background: var(--card); margin-top: 6px;
+}
+.goal-ring {
+  width: 46px; height: 46px; flex: none; border-radius: 50%;
+  display: grid; place-items: center; font-size: 1.3rem;
+  background: var(--sunk);
+}
+.goal-body { flex: 1; min-width: 0; }
+.goal-body .goal-title { font-size: .95rem; }
+.track { height: 12px; border-radius: 999px; background: var(--line); overflow: hidden; margin-top: 6px; }
+.track > i { display: block; height: 100%; border-radius: 999px; background: var(--green); transition: width .3s ease; }
+.track.blue > i { background: var(--blue); }
+
+/* ---------------- lesson ---------------- */
+.lesson-top {
+  position: sticky; top: 0; z-index: 20;
+  display: flex; align-items: center; gap: 12px;
+  padding: 14px 18px; background: var(--bg);
+  max-width: 700px; margin: 0 auto;
+}
+.close-x {
+  background: none; border: 0; cursor: pointer; color: var(--text-dim);
+  font-size: 1.5rem; line-height: 1; padding: 0 4px;
+}
+.lesson-body { max-width: 700px; margin: 0 auto; padding: 10px 18px 190px; }
+.kicker {
+  font-size: .72rem; font-weight: 800; letter-spacing: .12em; text-transform: uppercase;
+  color: var(--text-dim); margin-bottom: 10px;
+}
+.passage {
+  background: var(--sunk); border-radius: 14px; padding: 14px 16px;
+  font-weight: 700; font-size: .93rem; line-height: 1.65; color: var(--text);
+  margin-bottom: 18px;
+}
+.prompt { font-size: 1.35rem; font-weight: 800; line-height: 1.4; margin: 0 0 20px; }
+.prompt.big { font-size: 3.2rem; line-height: 1.15; }
+.prompt.script { font-size: 3.6rem; }
+
+.options { display: grid; gap: 11px; }
+.option {
+  display: flex; align-items: center; gap: 13px; width: 100%;
+  background: var(--card); color: var(--text);
+  border: 2px solid var(--line); border-bottom-width: 4px; border-radius: 14px;
+  padding: 14px 16px; cursor: pointer; text-align: left;
+  font-weight: 700; font-size: 1rem;
+}
+.option:hover:not([disabled]) { background: var(--sunk); }
+.option .key {
+  width: 26px; height: 26px; flex: none; border-radius: 8px;
+  border: 2px solid var(--line); color: var(--text-dim);
+  display: grid; place-items: center; font-size: .74rem; font-weight: 800;
+}
+.option.sel { border-color: var(--blue); background: var(--blue-tint); color: var(--blue-dark); }
+.option.sel .key { border-color: var(--blue); color: var(--blue-dark); }
+.option.right { border-color: var(--green); background: var(--green-tint); color: var(--green-dark); }
+.option.right .key { border-color: var(--green-dark); color: var(--green-dark); }
+.option.wrong { border-color: var(--red); background: var(--red-tint); color: var(--red-dark); }
+.option.wrong .key { border-color: var(--red-dark); color: var(--red-dark); }
+.option[disabled] { cursor: default; }
+
+.type-answer {
+  width: 100%; font: inherit; font-size: 1.15rem; font-weight: 700;
+  padding: 15px 16px; border-radius: 14px;
+  border: 2px solid var(--line); border-bottom-width: 4px;
+  background: var(--card); color: var(--text);
+}
+.type-answer:focus { outline: none; border-color: var(--blue); }
+.type-answer[disabled] { opacity: .75; }
+
+/* bottom bar + feedback */
+.footbar {
+  position: fixed; left: 0; right: 0; bottom: 0; z-index: 25;
+  border-top: 2px solid var(--line); background: var(--bg);
+}
+.footbar.ok { background: var(--green-tint); border-top-color: transparent; }
+.footbar.no { background: var(--red-tint); border-top-color: transparent; }
+.footbar-inner {
+  max-width: 700px; margin: 0 auto; padding: 16px 18px;
+  display: flex; align-items: center; gap: 14px; flex-wrap: wrap;
+}
+.verdict { flex: 1; min-width: 200px; }
+.verdict .headline { font-size: 1.1rem; font-weight: 800; display: flex; align-items: center; gap: 8px; }
+.footbar.ok .verdict { color: var(--green-dark); }
+.footbar.no .verdict { color: var(--red-dark); }
+.verdict .why { font-size: .86rem; font-weight: 700; opacity: .95; margin-top: 3px; }
+.footbar .btn { min-width: 160px; }
+
+/* ---------------- results ---------------- */
+.result { text-align: center; padding: 30px 18px 40px; max-width: 640px; margin: 0 auto; }
+.result .mascot { margin-bottom: 4px; }
+.result h1 { font-size: 1.8rem; margin-bottom: 6px; }
+.result .subline { color: var(--text-dim); margin-bottom: 24px; }
+.tally { display: flex; gap: 12px; justify-content: center; margin-bottom: 26px; flex-wrap: wrap; }
+.tally-box {
+  flex: 1; min-width: 130px; border-radius: 14px; padding: 3px;
+  background: var(--yellow); box-shadow: 0 3px 0 var(--yellow-dark);
+}
+.tally-box.blue { background: var(--blue); box-shadow: 0 3px 0 var(--blue-dark); }
+.tally-box.green { background: var(--green); box-shadow: 0 3px 0 var(--green-dark); }
+.tally-label {
+  color: #fff; font-size: .68rem; font-weight: 800; letter-spacing: .1em;
+  text-transform: uppercase; padding: 5px;
+}
+.tally-value {
+  background: var(--card); border-radius: 12px; padding: 10px;
+  font-size: 1.5rem; font-weight: 800;
+}
+.tally-box .tally-value { color: var(--yellow-dark); }
+.tally-box.blue .tally-value { color: var(--blue); }
+.tally-box.green .tally-value { color: var(--green); }
+
+.review { text-align: left; display: grid; gap: 8px; margin: 26px 0; }
+.review-item {
+  border: 2px solid var(--line); border-radius: 12px; padding: 10px 13px;
+  font-size: .88rem; font-weight: 700; background: var(--card);
+}
+.review-item.miss { border-color: var(--red); background: var(--red-tint); color: var(--red-dark); }
+.review-item .r-a { font-weight: 700; opacity: .85; margin-top: 2px; }
+
+/* ---------------- stats ---------------- */
+.stat-grid { display: grid; gap: 12px; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); }
+.stat-card {
+  border: 2px solid var(--line); border-radius: var(--radius); padding: 14px 16px;
+  display: flex; align-items: center; gap: 12px; background: var(--card);
+}
+.stat-card .big { font-size: 1.5rem; font-weight: 800; }
+.stat-card .cap { font-size: .78rem; font-weight: 700; color: var(--text-dim); }
+.rows { display: grid; gap: 8px; margin-top: 12px; }
+.row {
+  display: flex; align-items: center; gap: 12px;
+  border: 2px solid var(--line); border-radius: 14px; padding: 12px 14px; background: var(--card);
+}
+.row-main { flex: 1; min-width: 0; }
+.row-main .row-title { font-size: .95rem; }
+.row-main .row-sub { font-size: .78rem; color: var(--text-dim); font-weight: 700; }
+.row-num { font-size: 1rem; font-weight: 800; white-space: nowrap; }
+
+.empty { text-align: center; color: var(--text-dim); padding: 40px 20px; font-weight: 700; }
+
+.modal-backdrop {
+  position: fixed; inset: 0; z-index: 50; background: rgba(0,0,0,.45);
+  display: grid; place-items: center; padding: 20px;
+}
+.modal {
+  background: var(--card); border-radius: 20px; padding: 26px 22px;
+  max-width: 380px; width: 100%; text-align: center;
+}
+.modal h2 { font-size: 1.25rem; margin-bottom: 8px; }
+.modal p { color: var(--text-dim); font-weight: 700; margin: 0 0 20px; }
+.modal .btn { width: 100%; margin-bottom: 10px; }
+
+@media (max-width: 520px) {
+  .prompt { font-size: 1.2rem; }
+  .prompt.big { font-size: 2.6rem; }
+  .prompt.script { font-size: 3rem; }
+  .footbar .btn { width: 100%; }
+  .node { width: 64px; height: 60px; font-size: 1.3rem; }
+}
+</style>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>📚</text></svg>">
+</head>
+<body>
+
+<div id="hud"></div>
+<main id="app"></main>
+
+<script>
+/* State: learner profile, XP, hearts, streak and per-lesson progress. All in localStorage. */
+window.StudyHub = window.StudyHub || {};
+
+(function (SH) {
+  'use strict';
+
+  var KEY = 'studyhub.state.v2';
+  var PROFILE_KEY = 'studyhub.profile.v2';
+  var THEME_KEY = 'studyhub.theme';
+
+  var MAX_HEARTS = 5;
+  var HEART_REFILL_MS = 20 * 60 * 1000;   // one heart every 20 minutes
+  var LESSONS_PER_UNIT = 5;
+  var QUESTIONS_PER_LESSON = 8;
+  var XP_PER_LESSON = 10;
+
+  var blank = {
+    xp: 0,
+    hearts: { n: MAX_HEARTS, ts: 0 },
+    lessons: {},         // "subject/topic/0" -> { done: true, best: 90 }
+    topics: {},          // "subject/topic"   -> { asked, correct, sessions }
+    totals: { asked: 0, correct: 0 },
+    days: {},            // "YYYY-MM-DD" -> questions answered
+    goal: 30,            // daily XP goal
+    streak: { current: 0, best: 0, last: null }
+  };
+
+  function clone(x) { return JSON.parse(JSON.stringify(x)); }
+
+  function read() {
+    try {
+      var raw = localStorage.getItem(KEY);
+      if (!raw) return clone(blank);
+      var data = JSON.parse(raw);
+      for (var k in blank) if (!(k in data)) data[k] = clone(blank[k]);
+      return data;
+    } catch (e) { return clone(blank); }
+  }
+
+  function write(data) {
+    try { localStorage.setItem(KEY, JSON.stringify(data)); } catch (e) { /* private mode: run unsaved */ }
+    return data;
+  }
+
+  function pad(n) { return n < 10 ? '0' + n : '' + n; }
+  function today() {
+    var d = new Date();
+    return d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-' + pad(d.getDate());
+  }
+  function dayDiff(a, b) {
+    return Math.round((Date.parse(b + 'T00:00:00') - Date.parse(a + 'T00:00:00')) / 86400000);
+  }
+
+  /* Hearts regenerate with time, so they are always recomputed on read. */
+  function settleHearts(data) {
+    var h = data.hearts || { n: MAX_HEARTS, ts: 0 };
+    if (h.n >= MAX_HEARTS) { h.n = MAX_HEARTS; h.ts = 0; data.hearts = h; return data; }
+    if (!h.ts) h.ts = Date.now();
+    var gained = Math.floor((Date.now() - h.ts) / HEART_REFILL_MS);
+    if (gained > 0) {
+      h.n = Math.min(MAX_HEARTS, h.n + gained);
+      h.ts = h.n >= MAX_HEARTS ? 0 : h.ts + gained * HEART_REFILL_MS;
+    }
+    data.hearts = h;
+    return data;
+  }
+
+  var Progress = {
+    all: function () { return write(settleHearts(read())); },
+
+    /* ---- hearts ---- */
+    hearts: function () { return Progress.all().hearts.n; },
+    heartsMax: MAX_HEARTS,
+    msToNextHeart: function () {
+      var d = Progress.all();
+      if (d.hearts.n >= MAX_HEARTS) return 0;
+      return Math.max(0, HEART_REFILL_MS - (Date.now() - d.hearts.ts));
+    },
+    loseHeart: function () {
+      var d = Progress.all();
+      if (d.hearts.n === MAX_HEARTS) d.hearts.ts = Date.now();
+      d.hearts.n = Math.max(0, d.hearts.n - 1);
+      write(d);
+      return d.hearts.n;
+    },
+    refillHearts: function () {
+      var d = Progress.all();
+      d.hearts.n = MAX_HEARTS;
+      d.hearts.ts = 0;
+      return write(d).hearts.n;
+    },
+    gainHeart: function () {
+      var d = Progress.all();
+      if (d.hearts.n < MAX_HEARTS) { d.hearts.n += 1; if (d.hearts.n >= MAX_HEARTS) d.hearts.ts = 0; }
+      return write(d).hearts.n;
+    },
+
+    /* ---- lessons ---- */
+    lessonKey: function (s, t, i) { return s + '/' + t + '/' + i; },
+    lesson: function (s, t, i) { return Progress.all().lessons[s + '/' + t + '/' + i] || null; },
+    crowns: function (s, t) {
+      var d = Progress.all(), n = 0;
+      for (var i = 0; i < LESSONS_PER_UNIT; i++) if (d.lessons[s + '/' + t + '/' + i]) n++;
+      return n;
+    },
+    unitComplete: function (s, t) { return Progress.crowns(s, t) >= LESSONS_PER_UNIT; },
+
+    /* Records a finished lesson: XP, streak, accuracy and the crown. */
+    finishLesson: function (opts) {
+      var d = Progress.all();
+      var key = opts.subject + '/' + opts.topic;
+      var lessonKey = key + '/' + opts.lesson;
+      var pct = opts.asked ? Math.round((opts.correct / opts.asked) * 100) : 0;
+
+      if (opts.passed) {
+        var prev = d.lessons[lessonKey];
+        d.lessons[lessonKey] = { done: true, best: Math.max(pct, prev ? prev.best : 0) };
+        d.xp += opts.xp == null ? XP_PER_LESSON : opts.xp;
+      }
+
+      var t = d.topics[key] || { asked: 0, correct: 0, sessions: 0 };
+      t.asked += opts.asked;
+      t.correct += opts.correct;
+      t.sessions += 1;
+      d.topics[key] = t;
+
+      d.totals.asked += opts.asked;
+      d.totals.correct += opts.correct;
+
+      var day = today();
+      d.days[day] = (d.days[day] || 0) + opts.asked;
+
+      if (d.streak.last !== day) {
+        d.streak.current = (d.streak.last && dayDiff(d.streak.last, day) === 1) ? d.streak.current + 1 : 1;
+        d.streak.last = day;
+        if (d.streak.current > d.streak.best) d.streak.best = d.streak.current;
+      }
+
+      return write(d);
+    },
+
+    /* ---- rollups for the stats page ---- */
+    subject: function (subjectId) {
+      var d = Progress.all(), out = { asked: 0, correct: 0, sessions: 0, crowns: 0 };
+      Object.keys(d.topics).forEach(function (k) {
+        if (k.indexOf(subjectId + '/') !== 0) return;
+        out.asked += d.topics[k].asked;
+        out.correct += d.topics[k].correct;
+        out.sessions += d.topics[k].sessions;
+      });
+      Object.keys(d.lessons).forEach(function (k) {
+        if (k.indexOf(subjectId + '/') === 0) out.crowns++;
+      });
+      return out;
+    },
+    topic: function (s, t) {
+      return Progress.all().topics[s + '/' + t] || { asked: 0, correct: 0, sessions: 0 };
+    },
+    xpToday: function () {
+      var d = Progress.all();
+      return d.days[today()] || 0;
+    },
+    setGoal: function (n) { var d = Progress.all(); d.goal = n; return write(d); },
+
+    reset: function () { write(clone(blank)); },
+
+    LESSONS_PER_UNIT: LESSONS_PER_UNIT,
+    QUESTIONS_PER_LESSON: QUESTIONS_PER_LESSON,
+    XP_PER_LESSON: XP_PER_LESSON
+  };
+
+  /* ---------------- learner profile: age -> syllabus stage ---------------- */
+  var STAGES = [
+    { id: 'early',     name: 'Early Years',   min: 4,  max: 7,   label: 'Ages 4–7',
+      grades: 'Reception–Year 2 · Grades K–2', bands: [1] },
+    { id: 'primary',   name: 'Primary',       min: 8,  max: 10,  label: 'Ages 8–10',
+      grades: 'Years 3–6 · Grades 3–5', bands: [1] },
+    { id: 'middle',    name: 'Middle School', min: 11, max: 13,  label: 'Ages 11–13',
+      grades: 'Years 7–9 · Grades 6–8', bands: [1, 2] },
+    { id: 'secondary', name: 'Secondary',     min: 14, max: 16,  label: 'Ages 14–16',
+      grades: 'GCSE · Grades 9–11', bands: [2, 3] },
+    { id: 'advanced',  name: 'Advanced',      min: 17, max: 120, label: 'Ages 17+',
+      grades: 'A-level · College', bands: [3] }
+  ];
+
+  function stageForAge(age) {
+    for (var i = 0; i < STAGES.length; i++) if (age <= STAGES[i].max) return i;
+    return STAGES.length - 1;
+  }
+
+  var Profile = {
+    get: function () {
+      try {
+        var raw = localStorage.getItem(PROFILE_KEY);
+        if (!raw) return null;
+        var p = JSON.parse(raw);
+        if (typeof p.age !== 'number' || !isFinite(p.age)) return null;
+        p.stageIndex = stageForAge(p.age);
+        p.stage = STAGES[p.stageIndex];
+        return p;
+      } catch (e) { return null; }
+    },
+    set: function (age, name) {
+      var p = { age: age, name: name || '', setAt: new Date().toISOString() };
+      try { localStorage.setItem(PROFILE_KEY, JSON.stringify(p)); } catch (e) {}
+      p.stageIndex = stageForAge(age);
+      p.stage = STAGES[p.stageIndex];
+      return p;
+    },
+    clear: function () { try { localStorage.removeItem(PROFILE_KEY); } catch (e) {} },
+    stages: STAGES,
+    stageForAge: stageForAge
+  };
+
+  var Theme = {
+    get: function () { try { return localStorage.getItem(THEME_KEY); } catch (e) { return null; } },
+    set: function (mode) {
+      try { localStorage.setItem(THEME_KEY, mode); } catch (e) {}
+      document.documentElement.setAttribute('data-theme', mode);
+    },
+    init: function () {
+      var saved = Theme.get();
+      var dark = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
+      document.documentElement.setAttribute('data-theme', saved || (dark ? 'dark' : 'light'));
+    },
+    toggle: function () {
+      var next = document.documentElement.getAttribute('data-theme') === 'dark' ? 'light' : 'dark';
+      Theme.set(next);
+      return next;
+    }
+  };
+
+  /* ---- shared helpers used by every subject generator ---- */
+  var U = {
+    int: function (min, max) { return Math.floor(Math.random() * (max - min + 1)) + min; },
+    pick: function (arr) { return arr[Math.floor(Math.random() * arr.length)]; },
+    shuffle: function (arr) {
+      var a = arr.slice();
+      for (var i = a.length - 1; i > 0; i--) {
+        var j = Math.floor(Math.random() * (i + 1));
+        var t = a[i]; a[i] = a[j]; a[j] = t;
+      }
+      return a;
+    },
+    /* Sample n distinct items; reshuffles if the pool is smaller than n. */
+    sample: function (arr, n) {
+      var out = [];
+      if (!arr.length) return out;
+      while (out.length < n) {
+        var batch = U.shuffle(arr);
+        for (var i = 0; i < batch.length && out.length < n; i++) out.push(batch[i]);
+      }
+      return out;
+    },
+    /* Keep only bank items whose difficulty band suits the learner's stage.
+       Bank items carry their band as the last element of the tuple. If the
+       stage's own bands hold too little, widen downwards so nothing is empty. */
+    forStage: function (bank, stageIndex) {
+      var stage = STAGES[stageIndex == null ? 2 : stageIndex];
+      var want = stage.bands;
+      function bandOf(it) {
+        var b = it[it.length - 1];
+        return typeof b === 'number' ? b : 2;
+      }
+      var inStage = bank.filter(function (it) { return want.indexOf(bandOf(it)) !== -1; });
+      if (inStage.length >= 8) return inStage;
+      var ceiling = Math.max.apply(null, want);
+      var widened = bank.filter(function (it) { return bandOf(it) <= ceiling; });
+      return widened.length ? widened : bank;
+    },
+    /* Multiple choice from a correct value plus a pool of distractors. */
+    choice: function (prompt, correct, pool, extra) {
+      var seen = {}; seen[String(correct)] = true;
+      var wrong = [];
+      U.shuffle(pool).forEach(function (x) {
+        var s = String(x);
+        if (seen[s] || s === 'undefined' || s === 'NaN') return;
+        seen[s] = true;
+        if (wrong.length < 3) wrong.push(s);
+      });
+      var options = U.shuffle([String(correct)].concat(wrong));
+      var q = { type: 'choice', prompt: prompt, choices: options, answer: options.indexOf(String(correct)) };
+      if (extra) for (var k in extra) q[k] = extra[k];
+      return q;
+    },
+    /* Numeric distractors that stay plausible next to the real answer. */
+    nearby: function (n, spread) {
+      spread = spread || Math.max(2, Math.round(Math.abs(n) * 0.2) || 2);
+      var set = {}, out = [], guard = 0;
+      while (out.length < 6 && guard++ < 60) {
+        var d = U.int(-spread, spread);
+        if (d === 0 || set[n + d]) continue;
+        set[n + d] = true;
+        out.push(n + d);
+      }
+      return out;
+    }
+  };
+
+  SH.Progress = Progress;
+  SH.Profile = Profile;
+  SH.STAGES = STAGES;
+  SH.Theme = Theme;
+  SH.U = U;
+  SH.subjects = SH.subjects || [];
+  SH.register = function (subject) { SH.subjects.push(subject); };
+  SH.subject = function (id) {
+    for (var i = 0; i < SH.subjects.length; i++) if (SH.subjects[i].id === id) return SH.subjects[i];
+    return null;
+  };
+})(window.StudyHub);
+</script>
+<script>
+/* English — vocabulary, grammar, spelling, idioms and reading.
+   Every bank item ends with a difficulty band: 1 = ages 4–10, 2 = 11–13, 3 = 14+. */
+(function (SH) {
+  'use strict';
+  var U = SH.U;
+
+  /* [word, part of speech, meaning, band] */
+  var VOCAB = [
+    ['brave', 'adj', 'not afraid to do something difficult', 1],
+    ['bright', 'adj', 'giving out a lot of light, or very clever', 1],
+    ['calm', 'adj', 'quiet and not upset', 1],
+    ['clever', 'adj', 'quick at learning and understanding', 1],
+    ['damp', 'adj', 'slightly wet', 1],
+    ['enormous', 'adj', 'extremely big', 1],
+    ['gentle', 'adj', 'kind and careful, not rough', 1],
+    ['gather', 'verb', 'to bring things together in one place', 1],
+    ['hurry', 'verb', 'to move or do something quickly', 1],
+    ['journey', 'noun', 'a trip from one place to another', 1],
+    ['nervous', 'adj', 'worried about what might happen', 1],
+    ['peaceful', 'adj', 'quiet and free from trouble', 1],
+    ['polite', 'adj', 'behaving in a way that shows respect', 1],
+    ['rescue', 'verb', 'to save someone from danger', 1],
+    ['shiver', 'verb', 'to shake because you are cold or afraid', 1],
+    ['stroll', 'verb', 'to walk in a slow, relaxed way', 1],
+    ['sturdy', 'adj', 'strong and not easily broken', 1],
+    ['whisper', 'verb', 'to speak very quietly', 1],
+    ['wander', 'verb', 'to walk around with no particular aim', 1],
+    ['weary', 'adj', 'very tired', 1],
+
+    ['abundant', 'adj', 'existing in large quantities; plentiful', 2],
+    ['adapt', 'verb', 'to change in order to fit a new situation', 2],
+    ['anticipate', 'verb', 'to expect something and prepare for it', 2],
+    ['brittle', 'adj', 'hard but easily broken', 2],
+    ['compel', 'verb', 'to force or strongly persuade someone to act', 2],
+    ['deliberate', 'adj', 'done on purpose, not by accident', 2],
+    ['diligent', 'adj', 'careful and hardworking', 2],
+    ['diminish', 'verb', 'to become or make smaller or weaker', 2],
+    ['endure', 'verb', 'to suffer something patiently, or to last a long time', 2],
+    ['evident', 'adj', 'plain to see or understand', 2],
+    ['genuine', 'adj', 'real, not fake or pretended', 2],
+    ['hostile', 'adj', 'unfriendly or opposed to something', 2],
+    ['illustrate', 'verb', 'to make something clearer with an example or picture', 2],
+    ['immense', 'adj', 'extremely large', 2],
+    ['persist', 'verb', 'to continue firmly despite difficulty', 2],
+    ['reluctant', 'adj', 'unwilling and hesitant', 2],
+    ['scarce', 'adj', 'not available in sufficient quantity', 2],
+    ['significant', 'adj', 'large or important enough to matter', 2],
+    ['thrive', 'verb', 'to grow strongly and do well', 2],
+    ['vivid', 'adj', 'producing strong, clear images in the mind', 2],
+
+    ['ambiguous', 'adj', 'open to more than one interpretation', 3],
+    ['candid', 'adj', 'honest and direct, even when it is awkward', 3],
+    ['coherent', 'adj', 'logical and clearly connected', 3],
+    ['concise', 'adj', 'saying a lot in few words', 3],
+    ['eloquent', 'adj', 'fluent and persuasive in speech or writing', 3],
+    ['feasible', 'adj', 'possible to do easily or conveniently', 3],
+    ['fluctuate', 'verb', 'to rise and fall irregularly', 3],
+    ['frugal', 'adj', 'careful with money and resources', 3],
+    ['inevitable', 'adj', 'certain to happen and impossible to avoid', 3],
+    ['intricate', 'adj', 'having many small parts arranged in a complicated way', 3],
+    ['justify', 'verb', 'to show that something is reasonable or right', 3],
+    ['lenient', 'adj', 'more merciful or tolerant than expected', 3],
+    ['meticulous', 'adj', 'showing great attention to detail', 3],
+    ['monotonous', 'adj', 'dull and repetitive, never changing', 3],
+    ['obsolete', 'adj', 'no longer used because something better exists', 3],
+    ['plausible', 'adj', 'seeming reasonable or probable', 3],
+    ['resilient', 'adj', 'able to recover quickly from difficulties', 3],
+    ['sceptical', 'adj', 'not easily convinced; having doubts', 3],
+    ['subtle', 'adj', 'so slight that it is hard to notice', 3],
+    ['tentative', 'adj', 'not certain or fixed; provisional', 3],
+    ['versatile', 'adj', 'able to be used for many different purposes', 3]
+  ];
+
+  /* [word, synonym, antonym, band] */
+  var PAIRS = [
+    ['big', 'large', 'small', 1],
+    ['happy', 'glad', 'sad', 1],
+    ['hot', 'warm', 'cold', 1],
+    ['fast', 'quick', 'slow', 1],
+    ['begin', 'start', 'finish', 1],
+    ['near', 'close', 'far', 1],
+    ['hard', 'difficult', 'easy', 1],
+    ['loud', 'noisy', 'quiet', 1],
+    ['old', 'ancient', 'new', 1],
+    ['brave', 'courageous', 'cowardly', 1],
+    ['clever', 'intelligent', 'foolish', 1],
+    ['polite', 'courteous', 'rude', 1],
+
+    ['brief', 'short', 'lengthy', 2],
+    ['calm', 'peaceful', 'agitated', 2],
+    ['common', 'ordinary', 'rare', 2],
+    ['generous', 'giving', 'stingy', 2],
+    ['increase', 'grow', 'decrease', 2],
+    ['rapid', 'swift', 'sluggish', 2],
+    ['silent', 'quiet', 'noisy', 2],
+    ['wealthy', 'rich', 'poor', 2],
+
+    ['confident', 'self-assured', 'insecure', 3],
+    ['humble', 'modest', 'arrogant', 3],
+    ['permanent', 'lasting', 'temporary', 3],
+    ['rigid', 'stiff', 'flexible', 3],
+    ['sufficient', 'adequate', 'inadequate', 3],
+    ['transparent', 'clear', 'opaque', 3],
+    ['affluent', 'prosperous', 'impoverished', 3],
+    ['obscure', 'unclear', 'obvious', 3]
+  ];
+
+  /* [sentence with ___, options (first is correct), explanation, band] */
+  var GRAMMAR = [
+    ['I have ___ apple in my bag.', ['an', 'a', 'the', 'some'], 'Use "an" before a vowel sound: an apple.', 1],
+    ['There ___ three cats on the wall.', ['are', 'is', 'am', 'be'], '"Three cats" is plural, so we use "are".', 1],
+    ['She ___ to school every morning.', ['walks', 'walk', 'walking', 'walked'], 'With he/she/it the present simple takes an -s: she walks.', 1],
+    ['Yesterday we ___ to the park.', ['went', 'go', 'goes', 'going'], 'Yesterday means the past, so "go" becomes "went".', 1],
+    ['The plural of "child" is...', ['children', 'childs', 'childes', 'childrens'], '"Child" has an irregular plural: children.', 1],
+    ['Which sentence is punctuated correctly?', ['Where is my book?', 'where is my book?', 'Where is my book', 'where is my book.'], 'A sentence starts with a capital letter, and a question ends with a question mark.', 1],
+    ['This is ___ book.', ['my', 'me', 'I', 'mine book'], '"My" comes before a noun; "mine" stands alone.', 1],
+    ['The dog is ___ the table.', ['under', 'of', 'off', 'than'], '"Under" describes a position below something.', 1],
+    ['He is ___ than his sister.', ['taller', 'more tall', 'tallest', 'more taller'], 'Short adjectives add -er for comparisons: taller.', 1],
+    ['We ___ playing football now.', ['are', 'is', 'am', 'be'], '"We" takes "are" in the present continuous.', 1],
+
+    ['They ___ dinner when the phone rang.', ['were having', 'have', 'has had', 'are having'], 'A longer past action interrupted by a shorter one uses the past continuous.', 2],
+    ['I have lived here ___ 2019.', ['since', 'for', 'from', 'during'], '"Since" marks a starting point; "for" marks a length of time.', 2],
+    ['If it ___ tomorrow, we will cancel the picnic.', ['rains', 'will rain', 'rained', 'would rain'], 'In a first conditional the "if" clause stays in the present simple.', 2],
+    ['This is the book ___ changed my mind.', ['that', 'who', 'whose', 'what'], '"That" or "which" introduces a relative clause about a thing.', 2],
+    ['I ___ finished my homework yet.', ["haven't", "didn't", "don't have", "hadn't"], '"Yet" pairs with the present perfect.', 2],
+    ['The letter ___ posted yesterday.', ['was', 'is', 'has', 'were'], 'Past passive, singular subject: was posted.', 2],
+    ['We look forward to ___ from you.', ['hearing', 'hear', 'heard', 'be heard'], '"Look forward to" takes the -ing form.', 2],
+    ['This soup tastes ___.', ['delicious', 'deliciously', 'more delicious', 'deliciousness'], 'After a linking verb you need an adjective, not an adverb.', 2],
+    ['___ you like some tea?', ['Would', 'Are', 'Do', 'Will'], '"Would you like...?" is the standard polite offer.', 2],
+    ['The keys are ___ the drawer.', ['in', 'on', 'at', 'to'], '"In" is used for something inside an enclosed space.', 2],
+
+    ['He asked me where I ___ from.', ['came', 'come', 'am coming', 'will come'], 'Reported speech shifts the present into the past.', 3],
+    ['I would rather ___ at home tonight.', ['stay', 'to stay', 'staying', 'stayed'], '"Would rather" is followed by the bare infinitive.', 3],
+    ['Neither of the answers ___ correct.', ['is', 'are', 'were', 'be'], '"Neither of" takes a singular verb in formal English.', 3],
+    ['By the time we arrived, the film ___.', ['had started', 'started', 'has started', 'starts'], 'The earlier of two past events takes the past perfect.', 3],
+    ['I wish I ___ how to swim.', ['knew', 'know', 'have known', 'will know'], 'Wishes about the present use the past simple.', 3],
+    ['She apologised ___ being late.', ['for', 'to', 'of', 'about being'], 'The fixed pattern is "apologise for + -ing".', 3],
+    ['You ___ smoke in here — it is against the rules.', ["mustn't", "don't have to", "needn't", "wouldn't"], '"Mustn\'t" means prohibited; "don\'t have to" only means not required.', 3],
+    ['Had I known, I ___ differently.', ['would have acted', 'would act', 'will act', 'had acted'], 'A third conditional with inversion: would have + past participle.', 3],
+    ['The report, ___ was published on Monday, caused a stir.', ['which', 'that', 'what', 'who'], 'A non-defining relative clause after a comma uses "which", never "that".', 3],
+    ['Hardly ___ sat down when the bell rang.', ['had I', 'I had', 'did I', 'I have'], 'After a negative adverb like "hardly", the subject and auxiliary invert.', 3]
+  ];
+
+  /* [correct spelling, misspellings, hint, band] */
+  var SPELLING = [
+    ['because', ['becuse', 'becouse', 'becaus'], 'Big Elephants Can Always Understand Small Elephants.', 1],
+    ['friend', ['freind', 'frend', 'friendd'], 'It ends with "end": fri-end.', 1],
+    ['people', ['peple', 'peeple', 'peopel'], 'peo-ple — the "o" is silent.', 1],
+    ['said', ['sed', 'sayd', 'saide'], 'Past tense of "say" keeps the "ai".', 1],
+    ['school', ['scool', 'skool', 'schoool'], 'The "ch" makes a k sound: s-ch-ool.', 1],
+    ['beautiful', ['beatiful', 'beutiful', 'beautifull'], 'Big Elephants Are Ugly: b-e-a-u.', 1],
+    ['night', ['nite', 'nigt', 'niight'], 'The silent "gh" pattern: light, night, right.', 1],
+    ['different', ['diffrent', 'diferent', 'differant'], 'Three syllables: dif-fer-ent.', 1],
+    ['important', ['importent', 'importaint', 'inportant'], 'Ends in -ant.', 1],
+    ['tomorrow', ['tommorow', 'tomorow', 'tommorrow'], 'One m, two r\'s.', 1],
+
+    ['believe', ['beleive', 'belive', 'believ'], 'I before e except after c.', 2],
+    ['calendar', ['calender', 'calandar', 'callendar'], 'Ends in -ar, not -er.', 2],
+    ['definitely', ['definately', 'definitly', 'defenitely'], 'It contains the word "finite".', 2],
+    ['grateful', ['greatful', 'gratefull', 'gratful'], 'From "gratitude", not "great".', 2],
+    ['necessary', ['neccessary', 'necesary', 'neccesary'], 'One c, two s\'s.', 2],
+    ['separate', ['seperate', 'seperete', 'saparate'], 'There is "a rat" in sep-a-rate.', 2],
+    ['immediately', ['immediatly', 'imediately', 'immediatley'], 'Keep the e: immediate + ly.', 2],
+    ['argument', ['arguement', 'argumant', 'arguemant'], 'The e of "argue" is dropped before -ment.', 2],
+
+    ['accommodate', ['accomodate', 'acommodate', 'accommadate'], 'Two c\'s and two m\'s.', 3],
+    ['conscious', ['concious', 'consious', 'conscius'], 'Contains "scious": con-sci-ous.', 3],
+    ['embarrass', ['embarass', 'embarras', 'embaress'], 'Double r and double s.', 3],
+    ['existence', ['existance', 'existense', 'exsistence'], 'Ends in -ence.', 3],
+    ['maintenance', ['maintainance', 'maintenence', 'maintanance'], 'The verb is "maintain" but the noun drops the i.', 3],
+    ['occurrence', ['occurence', 'ocurrence', 'occurrance'], 'Double c, double r, and -ence.', 3],
+    ['perseverance', ['perseverence', 'persaverance', 'perserverance'], 'Ends in -ance.', 3],
+    ['privilege', ['priviledge', 'privelege', 'privilage'], 'No "d": pri-vi-lege.', 3],
+    ['rhythm', ['rythm', 'rhythem', 'rhytm'], 'Two h\'s and no vowel between them.', 3],
+    ['recommend', ['reccomend', 'recomend', 'reccommend'], 'One c, two m\'s.', 3]
+  ];
+
+  /* [idiom, meaning, band] */
+  var IDIOMS = [
+    ['piece of cake', 'something very easy to do', 1],
+    ['break the ice', 'to make people feel relaxed when they first meet', 1],
+    ['under the weather', 'feeling slightly ill', 1],
+    ['keep an eye on', 'to watch something carefully', 1],
+    ['once in a blue moon', 'very rarely', 1],
+    ['hit the books', 'to start studying seriously', 1],
+    ['call it a day', 'to stop working for the day', 1],
+    ['pull someone\'s leg', 'to joke by telling someone something untrue', 1],
+
+    ['let the cat out of the bag', 'to reveal a secret by accident', 2],
+    ['cost an arm and a leg', 'to be extremely expensive', 2],
+    ['on the same page', 'in agreement about something', 2],
+    ['get cold feet', 'to become nervous and back out of a plan', 2],
+    ['spill the beans', 'to give away information meant to be kept quiet', 2],
+    ['throw in the towel', 'to give up', 2],
+
+    ['bite off more than you can chew', 'to take on more than you can manage', 3],
+    ['the ball is in your court', 'it is your turn to decide or act', 3],
+    ['cut corners', 'to do something badly to save time or money', 3],
+    ['run out of steam', 'to lose energy or enthusiasm', 3],
+    ['sit on the fence', 'to avoid choosing a side', 3],
+    ['take it with a grain of salt', 'to not fully believe something', 3]
+  ];
+
+  var PASSAGES = [
+    {
+      title: 'Market Day', band: 1,
+      text: 'Every Saturday, Nadia helps her grandfather at the market. They arrive before sunrise and set out crates of oranges, onions and bright red peppers. Nadia\'s job is to count the change. At first she was slow and her grandfather had to help, but after a few months she could add the prices in her head faster than he could. On the way home he always buys her a warm pastry.',
+      questions: [
+        ['When do Nadia and her grandfather arrive at the market?', ['Before sunrise', 'At lunchtime', 'After dark', 'At noon'], 'The passage says they arrive before sunrise.'],
+        ['What is Nadia\'s job?', ['Counting the change', 'Driving the van', 'Growing the peppers', 'Washing the crates'], 'Her job is to count the change.'],
+        ['How did Nadia change over a few months?', ['She got much faster at adding', 'She stopped helping', 'She became slower', 'She moved away'], 'She could add prices faster than her grandfather.'],
+        ['What happens on the way home?', ['Her grandfather buys her a pastry', 'They visit the beach', 'They count the crates again', 'They go back to the market'], 'He always buys her a warm pastry.']
+      ]
+    },
+    {
+      title: 'The Class Garden', band: 1,
+      text: 'Class 4B decided to turn a patch of bare ground behind the school into a garden. They dug out the stones, mixed in compost and planted beans, carrots and sunflowers. Everyone took a turn watering after lunch. The beans grew first, climbing up strings the caretaker tied to the fence. By July the sunflowers were taller than Mr Osei, and the class ate their own carrots at the end-of-term picnic.',
+      questions: [
+        ['What did the class plant?', ['Beans, carrots and sunflowers', 'Apples and pears', 'Only grass', 'Roses and tulips'], 'They planted beans, carrots and sunflowers.'],
+        ['Which plant grew first?', ['The beans', 'The carrots', 'The sunflowers', 'The compost'], 'The passage says the beans grew first.'],
+        ['Who tied strings to the fence?', ['The caretaker', 'Mr Osei', 'The whole class', 'A parent'], 'The caretaker tied the strings for the beans to climb.'],
+        ['How do we know the sunflowers grew very tall?', ['They were taller than Mr Osei', 'They reached the roof', 'They filled the whole garden', 'They fell over'], 'By July they were taller than Mr Osei.']
+      ]
+    },
+    {
+      title: 'The First Maps of the Sea Floor', band: 2,
+      text: 'Until the 1950s, most people pictured the ocean floor as a flat, muddy plain. Marie Tharp changed that. Working from thousands of depth soundings that she was not allowed to collect herself — women were barred from the research ships — she drew the Atlantic sea floor by hand and found a vast mountain range running down its middle, split by a deep valley. Her map made continental drift hard to dismiss, though it took years for her colleagues to accept what the drawing showed.',
+      questions: [
+        ['What did most people believe about the ocean floor before the 1950s?', ['That it was a flat, muddy plain', 'That it was full of mountains', 'That it was made of ice', 'That it had no water'], 'The passage opens with that belief.'],
+        ['Why did Marie Tharp not collect the soundings herself?', ['Women were barred from the research ships', 'She preferred to stay in the office', 'The equipment was too heavy', 'She worked in a different country'], 'The passage states women were barred from the ships.'],
+        ['What did her map reveal?', ['A mountain range with a deep valley down the middle', 'A single flat plain', 'An underwater desert', 'A chain of islands'], 'She found a vast mid-ocean ridge split by a rift valley.'],
+        ['What does the last sentence suggest?', ['Good evidence is not always accepted quickly', 'Her colleagues agreed at once', 'The map was inaccurate', 'She stopped working on maps'], 'It took years for colleagues to accept what she had shown.']
+      ]
+    },
+    {
+      title: 'The Cost of a Shortcut', band: 3,
+      text: 'When a city widens a congested road, drivers who had been avoiding it return, and within a few years the queues are as long as before. Transport planners call this induced demand: capacity does not simply absorb existing traffic, it invites more. The same logic runs in reverse. Cities that have removed urban motorways — Seoul, San Francisco, Utrecht — generally did not see the gridlock their critics predicted, because some journeys were retimed, rerouted, or never made at all. Traffic, it turns out, behaves less like water in a pipe than like a crowd deciding where to stand.',
+      questions: [
+        ['What is "induced demand"?', ['New capacity attracts additional traffic', 'Traffic falls when roads widen', 'Drivers pay more for fuel', 'Roads wear out faster'], 'Extra capacity invites journeys that were not previously made.'],
+        ['What happened in cities that removed motorways?', ['The predicted gridlock largely did not appear', 'Traffic doubled overnight', 'All journeys stopped', 'Roads had to be rebuilt'], 'Journeys were retimed, rerouted, or not made at all.'],
+        ['What does the final comparison suggest about traffic?', ['It responds to choices rather than flowing fixedly', 'It is entirely predictable', 'It cannot be measured', 'It behaves exactly like water'], 'The crowd image stresses that drivers make decisions.'],
+        ['Which statement best sums up the passage?', ['Road capacity shapes demand as much as demand shapes capacity', 'Widening roads always fixes congestion', 'Cities should never change roads', 'Traffic is caused only by population growth'], 'That two-way relationship is the central point.']
+      ]
+    },
+    {
+      title: 'The Lost Kitten', band: 1,
+      text: 'Sam heard a small noise behind the shed. When he looked, a grey kitten was hiding under a flowerpot, wet and shivering. Sam wrapped it in his jumper and carried it inside. His mum put a bowl of warm milk on the floor. By evening the kitten was asleep on the sofa, purring so loudly that Sam could hear it from the kitchen.',
+      questions: [
+        ['Where was the kitten hiding?', ['Under a flowerpot', 'In the kitchen', 'On the sofa', 'In a tree'], 'The kitten was under a flowerpot behind the shed.'],
+        ['How did Sam keep the kitten warm?', ['He wrapped it in his jumper', 'He lit a fire', 'He put it in a box', 'He gave it a hat'], 'Sam wrapped the kitten in his jumper.'],
+        ['What did the kitten drink?', ['Warm milk', 'Cold water', 'Tea', 'Juice'], 'His mum put a bowl of warm milk on the floor.'],
+        ['How did the kitten feel by the evening?', ['Safe and sleepy', 'Frightened', 'Hungry', 'Angry'], 'It was asleep and purring loudly, so it felt safe.']
+      ]
+    },
+    {
+      title: 'Why Bread Rises', band: 2,
+      text: 'Bread dough rises because yeast, a single-celled fungus, feeds on the sugars in flour and releases carbon dioxide as a waste gas. The gluten network formed by kneading traps those bubbles, stretching like a balloon. Warmth speeds the process; cold slows it, which is why bakers sometimes leave dough in a refrigerator overnight to develop flavour without letting it grow too fast. Baking finally kills the yeast, but by then the bubbles are locked into the crumb.',
+      questions: [
+        ['What gas makes dough rise?', ['Carbon dioxide', 'Oxygen', 'Nitrogen', 'Steam only'], 'Yeast releases carbon dioxide as it feeds on sugars.'],
+        ['What traps the gas in the dough?', ['The gluten network', 'The sugar', 'The salt', 'The oven heat'], 'Kneading forms a gluten network that holds the bubbles.'],
+        ['Why do bakers chill dough overnight?', ['To slow the rise while flavour develops', 'To kill the yeast', 'To add more gas', 'To harden the crust'], 'Cold slows the yeast so flavour develops without over-rising.'],
+        ['What happens to the yeast during baking?', ['It is killed by the heat', 'It multiplies rapidly', 'It turns into gluten', 'It escapes as gas'], 'Baking finally kills the yeast.']
+      ]
+    },
+    {
+      title: 'The Lighthouse Keeper', band: 3,
+      text: 'For thirty-one years Ana kept the light at Cape Verity burning. The work was solitary but never idle: lamps had to be trimmed, brass polished, and the log filled in every four hours, storm or calm. When the harbour authority replaced the lamp with an automatic beacon in 1994, Ana was offered a desk job in town. She refused it. Instead she bought a small boat and began ferrying supplies to the islands, telling friends she had simply moved the same job onto the water.',
+      questions: [
+        ['How long did Ana keep the lighthouse?', ['Thirty-one years', 'Nineteen years', 'Since 1994', 'Four years'], 'The first sentence says "For thirty-one years".'],
+        ['Why did the lighthouse job end?', ['An automatic beacon replaced the lamp', 'Ana retired because of illness', 'The harbour closed', 'She was promoted'], 'The authority installed an automatic beacon in 1994.'],
+        ['What does the last sentence suggest about Ana?', ['She valued being useful to the islands', 'She disliked boats', 'She wanted an office job', 'She regretted her choice'], 'She saw ferrying supplies as the same work in a new place.'],
+        ['The word "solitary" here means:', ['done alone', 'dangerous', 'poorly paid', 'occasional'], 'Solitary describes work carried out alone.']
+      ]
+    },
+    {
+      title: 'The Quiet Hour', band: 3,
+      text: 'The city council introduced a "quiet hour" in the central library: between two and three each afternoon, no announcements were made, the printers were switched off, and staff answered questions in writing. It began as an accommodation for a handful of readers who found noise painful. Within a year, usage during that hour had doubled, and the council extended the practice to two other branches. What had been designed for a few turned out to be preferred by many.',
+      questions: [
+        ['Who was the quiet hour originally for?', ['Readers who found noise painful', 'Library staff', 'Schoolchildren', 'The council'], 'It began as an accommodation for such readers.'],
+        ['What happened to use of the library during that hour?', ['It doubled', 'It halved', 'It stayed the same', 'It stopped'], 'Usage during the hour had doubled within a year.'],
+        ['What is the main point of the last sentence?', ['A change made for a few can benefit many', 'Libraries should always be silent', 'The council wasted money', 'Few people used the library'], 'The accommodation turned out to be widely preferred.'],
+        ['How did staff answer questions?', ['In writing', 'By phone', 'They did not answer', 'Over a loudspeaker'], 'Staff answered questions in writing.']
+      ]
+    }
+  ];
+
+  /* ---------------- generators ---------------- */
+
+  function vocabulary(n, stage) {
+    var bank = U.forStage(VOCAB, stage);
+    return U.sample(bank, n).map(function (w) {
+      if (Math.random() < 0.5) {
+        var defs = bank.filter(function (x) { return x[0] !== w[0]; }).map(function (x) { return x[2]; });
+        return U.choice('What does "' + w[0] + '" mean?', w[2], defs, {
+          kicker: w[1],
+          explanation: '"' + w[0] + '" (' + w[1] + '): ' + w[2] + '.'
+        });
+      }
+      var words = bank.filter(function (x) { return x[0] !== w[0]; }).map(function (x) { return x[0]; });
+      return U.choice('Which word means "' + w[2] + '"?', w[0], words, {
+        kicker: 'choose the word',
+        explanation: '"' + w[0] + '" (' + w[1] + ') means ' + w[2] + '.'
+      });
+    });
+  }
+
+  function synonyms(n, stage) {
+    var bank = U.forStage(PAIRS, stage);
+    return U.sample(bank, n).map(function (p) {
+      var wantSyn = Math.random() < 0.5;
+      var correct = wantSyn ? p[1] : p[2];
+      var pool = [wantSyn ? p[2] : p[1]];
+      bank.forEach(function (q) { if (q[0] !== p[0]) { pool.push(q[1]); pool.push(q[2]); } });
+      return U.choice('Which word is ' + (wantSyn ? 'closest in meaning' : 'the opposite') + ' to "' + p[0] + '"?', correct, pool, {
+        kicker: wantSyn ? 'synonym' : 'antonym',
+        explanation: '"' + p[0] + '" — similar: ' + p[1] + ', opposite: ' + p[2] + '.'
+      });
+    });
+  }
+
+  function grammar(n, stage) {
+    return U.sample(U.forStage(GRAMMAR, stage), n).map(function (g) {
+      var correct = g[1][0];
+      var options = U.shuffle(g[1]);
+      return {
+        type: 'choice', kicker: 'complete the sentence',
+        prompt: g[0], choices: options, answer: options.indexOf(correct), explanation: g[2]
+      };
+    });
+  }
+
+  function spelling(n, stage) {
+    return U.sample(U.forStage(SPELLING, stage), n).map(function (s) {
+      var options = U.shuffle([s[0]].concat(s[1]));
+      return {
+        type: 'choice', kicker: 'which spelling is correct?',
+        prompt: 'Pick the correctly spelled word.',
+        choices: options, answer: options.indexOf(s[0]),
+        explanation: '"' + s[0] + '" — ' + s[2]
+      };
+    });
+  }
+
+  function idioms(n, stage) {
+    var bank = U.forStage(IDIOMS, stage);
+    return U.sample(bank, n).map(function (i) {
+      var others = bank.filter(function (x) { return x[0] !== i[0]; }).map(function (x) { return x[1]; });
+      return U.choice('What does "' + i[0] + '" mean?', i[1], others, {
+        kicker: 'idiom', explanation: '"' + i[0] + '" means ' + i[1] + '.'
+      });
+    });
+  }
+
+  function reading(n, stage) {
+    var bank = U.forStage(PASSAGES.map(function (p) { return [p, p.band]; }), stage).map(function (x) { return x[0]; });
+    var out = [];
+    var passages = U.shuffle(bank);
+    for (var p = 0; p < passages.length && out.length < n; p++) {
+      var pass = passages[p];
+      var qs = U.shuffle(pass.questions);
+      for (var i = 0; i < qs.length && out.length < n; i++) {
+        var q = qs[i];
+        var correct = q[1][0];
+        var options = U.shuffle(q[1]);
+        out.push({
+          type: 'choice', kicker: 'reading · ' + pass.title, passage: pass.text,
+          prompt: q[0], choices: options, answer: options.indexOf(correct), explanation: q[2]
+        });
+      }
+    }
+    // if one stage has few passages, cycle through them again rather than short-changing the lesson
+    var guard = 0;
+    while (out.length < n && passages.length && guard++ < 10) {
+      var extra = out.slice(0, Math.min(out.length, n - out.length));
+      out = out.concat(U.shuffle(extra));
+    }
+    return out.slice(0, n);
+  }
+
+  function cards(bank, front, back, sub) {
+    return function (stage) {
+      return U.forStage(bank, stage).map(function (w) {
+        return { front: w[front], back: w[back], sub: sub == null ? '' : w[sub] };
+      });
+    };
+  }
+
+  SH.register({
+    id: 'english',
+    name: 'English',
+    native: '',
+    emoji: '📖',
+    color: 'var(--english)',
+    blurb: 'Words, grammar, spelling and reading.',
+    topics: [
+      { id: 'vocabulary', name: 'Vocabulary', desc: 'Word meanings, both directions',
+        generate: vocabulary, flashcards: cards(VOCAB, 0, 2, 1) },
+      { id: 'synonyms', name: 'Synonyms & Antonyms', desc: 'Words that match and words that clash',
+        generate: synonyms, flashcards: cards(PAIRS, 0, 1, 2) },
+      { id: 'grammar', name: 'Grammar', desc: 'Tenses, articles, prepositions, agreement',
+        generate: grammar },
+      { id: 'spelling', name: 'Spelling', desc: 'The words people most often get wrong',
+        generate: spelling },
+      { id: 'idioms', name: 'Idioms', desc: 'Everyday expressions and what they mean',
+        generate: idioms, flashcards: cards(IDIOMS, 0, 1) },
+      { id: 'reading', name: 'Reading', desc: 'Short passages with questions',
+        generate: reading }
+    ]
+  });
+})(window.StudyHub);
+</script>
+<script>
+/* Math — questions are generated live and scaled to the learner's stage,
+   so a six-year-old counts to twenty while a sixth-former factorises quadratics. */
+(function (SH) {
+  'use strict';
+  var U = SH.U;
+
+  function gcd(a, b) { a = Math.abs(a); b = Math.abs(b); while (b) { var t = b; b = a % b; a = t; } return a; }
+  function lcm(a, b) { return a * b / gcd(a, b); }
+  function frac(n, d) { var g = gcd(n, d) || 1; return (n / g) + '/' + (d / g); }
+  function round(x, places) { var f = Math.pow(10, places == null ? 2 : places); return Math.round(x * f) / f; }
+  function money(x) { return '$' + x.toFixed(2); }
+  function num(prompt, value, opts) {
+    var q = { type: 'input', prompt: prompt, answer: String(value), accept: [String(value)] };
+    if (opts) for (var k in opts) q[k] = opts[k];
+    return q;
+  }
+
+  /* ============================ arithmetic ============================ */
+  var arith = {
+    addSmall: function () {
+      var a = U.int(1, 12), b = U.int(1, 20 - a), v = a + b;
+      return U.choice(a + ' + ' + b + ' = ?', v, U.nearby(v, 4), {
+        explanation: 'Start at ' + a + ' and count on ' + b + ' to reach ' + v + '.'
+      });
+    },
+    subSmall: function () {
+      var a = U.int(6, 20), b = U.int(1, a - 1), v = a - b;
+      return U.choice(a + ' − ' + b + ' = ?', v, U.nearby(v, 4), {
+        explanation: 'Count back ' + b + ' from ' + a + ' to land on ' + v + '. Check: ' + v + ' + ' + b + ' = ' + a + '.'
+      });
+    },
+    doubles: function () {
+      var a = U.int(2, 12), v = a * 2;
+      return U.choice('Double ' + a + ' is...', v, U.nearby(v, 5), {
+        explanation: a + ' + ' + a + ' = ' + v + '.'
+      });
+    },
+    easyTables: function () {
+      var a = U.pick([2, 5, 10]), b = U.int(2, 10), v = a * b;
+      return U.choice(a + ' × ' + b + ' = ?', v, U.nearby(v, Math.max(4, a * 2)), {
+        explanation: b + ' groups of ' + a + ' makes ' + v + '.'
+      });
+    },
+    add: function () {
+      var a = U.int(24, 480), b = U.int(24, 480), v = a + b;
+      return U.choice(a + ' + ' + b + ' = ?', v, U.nearby(v, 12), {
+        explanation: a + ' + ' + b + ' = ' + v + '. Add the ones, then the tens, carrying as you go.'
+      });
+    },
+    sub: function () {
+      var a = U.int(120, 900), b = U.int(20, a - 10), v = a - b;
+      return U.choice(a + ' − ' + b + ' = ?', v, U.nearby(v, 12), {
+        explanation: 'Check by adding back: ' + v + ' + ' + b + ' = ' + a + '.'
+      });
+    },
+    mul: function () {
+      var a = U.int(6, 19), b = U.int(6, 25), v = a * b;
+      return U.choice(a + ' × ' + b + ' = ?', v, U.nearby(v, Math.max(6, Math.round(v * 0.15))), {
+        explanation: 'Split it: ' + a + '×' + (b - b % 10) + ' + ' + a + '×' + (b % 10) + ' = ' + v + '.'
+      });
+    },
+    div: function () {
+      var b = U.int(3, 15), v = U.int(4, 30), a = b * v;
+      return U.choice(a + ' ÷ ' + b + ' = ?', v, U.nearby(v, 6), {
+        explanation: b + ' × ' + v + ' = ' + a + ', so ' + a + ' ÷ ' + b + ' = ' + v + '.'
+      });
+    },
+    order: function () {
+      var a = U.int(2, 9), b = U.int(2, 9), c = U.int(2, 12), v = a + b * c;
+      return U.choice(a + ' + ' + b + ' × ' + c + ' = ?', v, [(a + b) * c, a + b + c, a * b + c, v + c, v - b], {
+        explanation: 'Multiply first: ' + b + ' × ' + c + ' = ' + (b * c) + ', then add ' + a + ' to get ' + v + '.'
+      });
+    },
+    negatives: function () {
+      var a = U.int(-15, -2), b = U.int(2, 18), v = a + b;
+      return U.choice('(' + a + ') + ' + b + ' = ?', v, U.nearby(v, 6), {
+        explanation: 'Move ' + b + ' steps up the number line from ' + a + ' to reach ' + v + '.'
+      });
+    },
+    factors: function () {
+      var a = U.int(12, 60), b = U.int(12, 60);
+      var v = gcd(a, b);
+      return U.choice('What is the highest common factor of ' + a + ' and ' + b + '?', v,
+        [lcm(a, b), v * 2, v + 1, Math.min(a, b), 1], {
+          explanation: 'The largest number dividing both ' + a + ' and ' + b + ' exactly is ' + v + '.'
+        });
+    },
+    lcmQ: function () {
+      var a = U.int(3, 12), b = U.int(3, 12);
+      var v = lcm(a, b);
+      return U.choice('What is the lowest common multiple of ' + a + ' and ' + b + '?', v,
+        [a * b, gcd(a, b), v + a, v - b, v * 2], {
+          explanation: 'The smallest number both ' + a + ' and ' + b + ' divide into is ' + v + '.'
+        });
+    },
+    indices: function () {
+      var base = U.int(2, 7), a = U.int(2, 6), b = U.int(2, 6);
+      var mult = Math.random() < 0.5;
+      var v = mult ? a + b : Math.abs(a - b) || 1;
+      var expr = mult ? base + '^' + a + ' × ' + base + '^' + b : base + '^' + Math.max(a, b) + ' ÷ ' + base + '^' + Math.min(a, b);
+      if (!mult) v = Math.max(a, b) - Math.min(a, b);
+      return U.choice('Simplify: ' + expr, base + '^' + v,
+        [base + '^' + (a * b), base + '^' + (mult ? a * b : a + b), (base * base) + '^' + v, base + '^' + (v + 1), base + '^' + (v - 1)], {
+          explanation: mult
+            ? 'Multiplying powers of the same base adds the indices: ' + a + ' + ' + b + ' = ' + v + '.'
+            : 'Dividing powers of the same base subtracts the indices: ' + Math.max(a, b) + ' − ' + Math.min(a, b) + ' = ' + v + '.'
+        });
+    },
+    standardForm: function () {
+      var mantissa = round(U.int(101, 989) / 100, 2);
+      var power = U.int(3, 7);
+      var value = mantissa * Math.pow(10, power);
+      return U.choice('Write ' + value.toLocaleString('en-US') + ' in standard form.',
+        mantissa + ' × 10^' + power,
+        [mantissa + ' × 10^' + (power + 1), mantissa + ' × 10^' + (power - 1), (mantissa * 10) + ' × 10^' + power, (mantissa / 10) + ' × 10^' + power], {
+          explanation: 'Move the decimal point so the first number is between 1 and 10: ' + mantissa + ' × 10^' + power + '.'
+        });
+    },
+    sigFigs: function () {
+      var value = round(U.int(10000, 999999) / 100, 2);
+      var v = Number(value.toPrecision(3));
+      return U.choice('Round ' + value + ' to 3 significant figures.', v,
+        [Number(value.toPrecision(2)), Number(value.toPrecision(4)), Math.round(value), round(v + 1, 1)], {
+          explanation: 'The first three significant digits give ' + v + '.'
+        });
+    },
+    surds: function () {
+      var sq = U.pick([4, 9, 16, 25, 36]);
+      var rest = U.pick([2, 3, 5, 6, 7]);
+      var inside = sq * rest;
+      var v = Math.sqrt(sq) + '√' + rest;
+      return U.choice('Simplify √' + inside, v,
+        [inside + '√' + rest, Math.sqrt(sq) + '√' + inside, (Math.sqrt(sq) + 1) + '√' + rest, sq + '√' + rest], {
+          explanation: '√' + inside + ' = √' + sq + ' × √' + rest + ' = ' + v + '.'
+        });
+    }
+  };
+
+  /* ====================== fractions / decimals / % ====================== */
+  var fr = {
+    halves: function () {
+      var v = U.int(2, 12), whole = v * 2;
+      return U.choice('What is half of ' + whole + '?', v, U.nearby(v, 4), {
+        explanation: 'Half means split into two equal parts: ' + whole + ' ÷ 2 = ' + v + '.'
+      });
+    },
+    fractionOf: function () {
+      var d = U.pick([2, 3, 4, 5]), v = U.int(2, 8), whole = d * v;
+      return U.choice('What is 1/' + d + ' of ' + whole + '?', v, U.nearby(v, 4), {
+        explanation: 'Share ' + whole + ' into ' + d + ' equal groups: each is ' + v + '.'
+      });
+    },
+    simplify: function () {
+      var base = U.pick([[1, 2], [1, 3], [2, 3], [1, 4], [3, 4], [2, 5], [3, 5], [1, 6], [5, 6], [3, 8]]);
+      var k = U.int(2, 9), a = base[0] * k, b = base[1] * k, v = frac(a, b);
+      return U.choice('Write ' + a + '/' + b + ' in its simplest form.', v,
+        [frac(a, b + k), frac(a + k, b), base[0] + '/' + (base[1] + 1), a + '/' + b], {
+          explanation: 'Divide top and bottom by ' + gcd(a, b) + ': ' + a + '/' + b + ' = ' + v + '.'
+        });
+    },
+    addSame: function () {
+      var d = U.int(4, 12), a = U.int(1, d - 2), b = U.int(1, d - a), v = frac(a + b, d);
+      return U.choice(a + '/' + d + ' + ' + b + '/' + d + ' = ?', v,
+        [frac(a + b, d + d), (a + b) + '/' + (d * 2), frac(a + b + 1, d), frac(Math.abs(a - b), d)], {
+          explanation: 'Same denominator, so add the numerators: ' + (a + b) + '/' + d + ' = ' + v + '.'
+        });
+    },
+    addDiff: function () {
+      var pair = U.pick([[2, 3], [2, 4], [3, 4], [2, 5], [3, 6], [4, 6], [3, 5]]);
+      var c = pair[0], d = pair[1], a = U.int(1, c - 1), b = U.int(1, d - 1);
+      var den = c * d, top = a * d + b * c, v = frac(top, den);
+      return U.choice(a + '/' + c + ' + ' + b + '/' + d + ' = ?', v,
+        [(a + b) + '/' + (c + d), frac(top + 1, den), frac(a * b, c * d), frac(Math.abs(a * d - b * c), den)], {
+          explanation: 'Common denominator ' + den + ': ' + (a * d) + '/' + den + ' + ' + (b * c) + '/' + den + ' = ' + v + '.'
+        });
+    },
+    multiply: function () {
+      var b = U.int(3, 8), a = U.int(1, b - 1), d = U.int(3, 8), c = U.int(1, d - 1);
+      var v = frac(a * c, b * d);
+      return U.choice(a + '/' + b + ' × ' + c + '/' + d + ' = ?', v,
+        [frac(a + c, b + d), frac(a * d, b * c), frac(a * c, b + d), frac(a + c, b * d),
+         frac(a * c + 1, b * d), frac(a * c, b * d + 1)], {
+          explanation: 'Multiply the tops and the bottoms: ' + (a * c) + '/' + (b * d) + ' = ' + v + '.'
+        });
+    },
+    divide: function () {
+      var b = U.int(3, 8), a = U.int(1, b - 1), d = U.int(3, 8), c = U.int(1, d - 1);
+      var v = frac(a * d, b * c);
+      return U.choice(a + '/' + b + ' ÷ ' + c + '/' + d + ' = ?', v,
+        [frac(a * c, b * d), frac(a + d, b + c), frac(b * c, a * d), frac(a * d, b + c),
+         frac(a * d + 1, b * c), frac(a * d, b * c + 1)], {
+          explanation: 'Dividing by a fraction means multiplying by its reciprocal: ' + a + '/' + b + ' × ' + d + '/' + c + ' = ' + v + '.'
+        });
+    },
+    toDecimal: function () {
+      var f = U.pick([[1, 2, 0.5], [1, 4, 0.25], [3, 4, 0.75], [1, 5, 0.2], [2, 5, 0.4], [3, 5, 0.6], [4, 5, 0.8], [1, 8, 0.125], [3, 8, 0.375], [1, 10, 0.1], [7, 10, 0.7], [1, 20, 0.05]]);
+      var v = f[2];
+      return U.choice('Write ' + f[0] + '/' + f[1] + ' as a decimal.', v,
+        [round(v * 10, 3), round(v / 10, 4), round(v + 0.1, 3), round(v * 2, 3)], {
+          explanation: f[0] + ' ÷ ' + f[1] + ' = ' + v + '.'
+        });
+    },
+    percentOf: function () {
+      var pct = U.pick([5, 10, 15, 20, 25, 40, 50, 60, 75, 80]);
+      var whole = U.pick([20, 40, 60, 80, 120, 160, 200, 240, 300, 400]);
+      var v = round(whole * pct / 100);
+      return U.choice('What is ' + pct + '% of ' + whole + '?', v, U.nearby(v, Math.max(3, Math.round(v * 0.3))), {
+        explanation: pct + '% = ' + (pct / 100) + ', and ' + (pct / 100) + ' × ' + whole + ' = ' + v + '.'
+      });
+    },
+    percentChange: function () {
+      var start = U.pick([40, 50, 80, 120, 150, 200, 250]);
+      var change = U.pick([10, 20, 25, 50]);
+      var up = Math.random() < 0.5;
+      var delta = start * change / 100;
+      var v = round(up ? start + delta : start - delta);
+      return U.choice('A price of $' + start + ' ' + (up ? 'rises' : 'falls') + ' by ' + change + '%. What is the new price?',
+        v, [start, round(delta), round(up ? start - delta : start + delta), round(v + change), round(v - change)], {
+          explanation: change + '% of ' + start + ' is ' + round(delta) + ', so the new price is ' + v + '.'
+        });
+    },
+    reversePercent: function () {
+      var original = U.pick([40, 60, 80, 120, 200, 250]);
+      var change = U.pick([10, 20, 25]);
+      var after = round(original * (1 + change / 100));
+      return U.choice('After a ' + change + '% increase, a price is $' + after + '. What was the original price?',
+        original, [round(after * (1 - change / 100)), round(after - change), original + change, round(after / 2)], {
+          explanation: 'The new price is ' + (100 + change) + '% of the original, so divide: ' + after + ' ÷ ' + (1 + change / 100) + ' = ' + original + '.'
+        });
+    },
+    compound: function () {
+      var principal = U.pick([500, 1000, 2000, 2500]);
+      var rate = U.pick([2, 3, 4, 5]);
+      var years = U.int(2, 4);
+      var v = round(principal * Math.pow(1 + rate / 100, years));
+      return U.choice('$' + principal + ' is invested at ' + rate + '% compound interest for ' + years + ' years. What is it worth?',
+        money(v), [money(round(principal * (1 + rate * years / 100))), money(round(v + principal * rate / 100)), money(principal), money(round(v - principal))], {
+          explanation: principal + ' × 1.0' + (rate < 10 ? rate : rate) + '^' + years + ' = ' + money(v) + '. Simple interest would give less.'
+        });
+    },
+    compare: function () {
+      var f1 = U.pick([[1, 2], [2, 3], [3, 4], [3, 5], [5, 8], [2, 5], [4, 7]]);
+      var f2 = U.pick([[1, 3], [3, 8], [5, 6], [4, 5], [1, 4], [5, 9], [3, 7]]);
+      var v1 = f1[0] / f1[1], v2 = f2[0] / f2[1];
+      var labels = [f1[0] + '/' + f1[1], f2[0] + '/' + f2[1], 'they are equal'];
+      var ans = v1 > v2 ? labels[0] : (v2 > v1 ? labels[1] : labels[2]);
+      return {
+        type: 'choice',
+        prompt: 'Which is larger: ' + labels[0] + ' or ' + labels[1] + '?',
+        choices: labels, answer: labels.indexOf(ans),
+        explanation: 'As decimals: ' + round(v1, 3) + ' and ' + round(v2, 3) + '.'
+      };
+    }
+  };
+
+  /* ============================== algebra ============================== */
+  var alg = {
+    missing: function () {
+      var x = U.int(2, 12), b = U.int(1, 10), c = x + b;
+      return U.choice('What number goes in the box?   ▢ + ' + b + ' = ' + c, x, U.nearby(x, 4), {
+        explanation: 'Take ' + b + ' away from ' + c + ': ' + c + ' − ' + b + ' = ' + x + '.'
+      });
+    },
+    linear: function () {
+      var x = U.int(2, 20), b = U.int(1, 30), c = x + b;
+      return num('Solve for x:  x + ' + b + ' = ' + c, x, {
+        explanation: 'Subtract ' + b + ' from both sides: x = ' + x + '.'
+      });
+    },
+    twoStep: function () {
+      var a = U.int(2, 9), x = U.int(2, 15), b = U.int(1, 25), c = a * x + b;
+      return num('Solve for x:  ' + a + 'x + ' + b + ' = ' + c, x, {
+        explanation: 'Subtract ' + b + ': ' + a + 'x = ' + (c - b) + '. Divide by ' + a + ': x = ' + x + '.'
+      });
+    },
+    evaluate: function () {
+      var a = U.int(2, 9), b = U.int(2, 12), x = U.int(2, 10), v = a * x * x - b;
+      return U.choice('If x = ' + x + ', what is ' + a + 'x² − ' + b + '?', v,
+        [a * x * 2 - b, a * x * x + b, (a * x) * (a * x) - b, v + b, v - x], {
+          explanation: 'x² = ' + (x * x) + ', so ' + a + '×' + (x * x) + ' − ' + b + ' = ' + v + '.'
+        });
+    },
+    simplify: function () {
+      var a = U.int(2, 9), b = U.int(2, 9), c = U.int(2, 9);
+      var res = (a + b) + 'x + ' + c;
+      return U.choice('Simplify:  ' + a + 'x + ' + b + 'x + ' + c, res,
+        [(a * b) + 'x + ' + c, (a + b + c) + 'x', (a + b) + 'x − ' + c, (a + c) + 'x + ' + b], {
+          explanation: 'Only like terms combine: ' + a + 'x + ' + b + 'x = ' + (a + b) + 'x.'
+        });
+    },
+    expand: function () {
+      var a = U.int(2, 8), b = U.int(2, 9), c = U.int(2, 9);
+      var out = (a * b) + 'x + ' + (a * c);
+      return U.choice('Expand:  ' + a + '(' + b + 'x + ' + c + ')', out,
+        [(a * b) + 'x + ' + c, (a + b) + 'x + ' + (a + c), (a * b) + 'x + ' + (a * c + a), b + 'x + ' + (a * c)], {
+          explanation: 'Multiply both terms by ' + a + ': ' + (a * b) + 'x and ' + (a * c) + '.'
+        });
+    },
+    factorise: function () {
+      var k = U.int(2, 9), b = U.int(2, 9), c = U.int(2, 9);
+      var expr = (k * b) + 'x + ' + (k * c);
+      return U.choice('Factorise fully:  ' + expr, k + '(' + b + 'x + ' + c + ')',
+        [1 + '(' + (k * b) + 'x + ' + (k * c) + ')', b + '(' + k + 'x + ' + c + ')', k + '(' + b + 'x + ' + (k * c) + ')', (k * b) + '(x + ' + c + ')'], {
+          explanation: 'The highest common factor of ' + (k * b) + ' and ' + (k * c) + ' is ' + k + '.'
+        });
+    },
+    sequence: function () {
+      var start = U.int(2, 12), step = U.int(2, 11);
+      var terms = [start, start + step, start + 2 * step, start + 3 * step];
+      var v = start + 4 * step;
+      return U.choice('What comes next?  ' + terms.join(', ') + ', __', v,
+        [v + step, v - 1, v + 1, terms[3] * 2], {
+          explanation: 'Each term rises by ' + step + ', so the next is ' + terms[3] + ' + ' + step + ' = ' + v + '.'
+        });
+    },
+    nthTerm: function () {
+      var a = U.int(1, 10), d = U.int(2, 9);
+      var terms = [a, a + d, a + 2 * d, a + 3 * d];
+      var c = a - d;
+      var v = d + 'n' + (c === 0 ? '' : (c > 0 ? ' + ' + c : ' − ' + Math.abs(c)));
+      return U.choice('Find the nth term of:  ' + terms.join(', ') + ', ...', v,
+        [d + 'n', d + 'n + ' + a, (d + 1) + 'n + ' + c, a + 'n + ' + d, d + 'n − ' + a], {
+          explanation: 'The common difference is ' + d + ', so start with ' + d + 'n. At n = 1 that gives ' + d + ', and we need ' + a + ', so the nth term is ' + v + '.'
+        });
+    },
+    quadratic: function () {
+      var p = U.int(1, 8), q = U.int(1, 8);
+      var b = p + q, c = p * q;
+      var v = 'x = ' + p + ' or x = ' + q;
+      return U.choice('Solve:  x² − ' + b + 'x + ' + c + ' = 0', v,
+        ['x = −' + p + ' or x = −' + q, 'x = ' + b + ' or x = ' + c, 'x = ' + (p + 1) + ' or x = ' + q, 'x = ' + p + ' only'], {
+          explanation: 'It factorises as (x − ' + p + ')(x − ' + q + ') = 0, so x = ' + p + ' or x = ' + q + '.'
+        });
+    },
+    simultaneous: function () {
+      var x = U.int(1, 9), y = U.int(1, 9);
+      var s = x + y, d = x - y;
+      return U.choice('Solve:  x + y = ' + s + ' and x − y = ' + d, 'x = ' + x + ', y = ' + y,
+        ['x = ' + y + ', y = ' + x, 'x = ' + s + ', y = ' + d, 'x = ' + (x + 1) + ', y = ' + (y - 1), 'x = ' + d + ', y = ' + s], {
+          explanation: 'Add the equations: 2x = ' + (s + d) + ', so x = ' + x + '. Then y = ' + s + ' − ' + x + ' = ' + y + '.'
+        });
+    },
+    rearrange: function () {
+      var a = U.int(2, 8), b = U.int(2, 12);
+      return U.choice('Make x the subject of:  y = ' + a + 'x + ' + b, 'x = (y − ' + b + ') / ' + a,
+        ['x = y / ' + a + ' − ' + b, 'x = (y + ' + b + ') / ' + a, 'x = ' + a + 'y − ' + b, 'x = y − ' + b + ' × ' + a], {
+          explanation: 'Subtract ' + b + ' from both sides, then divide everything by ' + a + '.'
+        });
+    }
+  };
+
+  /* ============================= geometry ============================= */
+  var geo = {
+    shapes: function () {
+      var s = U.pick([['triangle', 3], ['square', 4], ['rectangle', 4], ['pentagon', 5], ['hexagon', 6], ['octagon', 8]]);
+      return U.choice('How many sides does a ' + s[0] + ' have?', s[1], [3, 4, 5, 6, 8, 10], {
+        explanation: 'A ' + s[0] + ' has ' + s[1] + ' sides.'
+      });
+    },
+    corners: function () {
+      var s = U.pick([['triangle', 3], ['square', 4], ['rectangle', 4], ['pentagon', 5], ['hexagon', 6], ['octagon', 8]]);
+      return U.choice('How many corners does a ' + s[0] + ' have?', s[1], [3, 4, 5, 6, 8, 10], {
+        explanation: 'A ' + s[0] + ' has the same number of corners as sides: ' + s[1] + '.'
+      });
+    },
+    solids: function () {
+      var s = U.pick([
+        ['sphere', 'a football'], ['cube', 'a dice'], ['cylinder', 'a tin of soup'],
+        ['cone', 'an ice-cream cone'], ['pyramid', 'the pyramids in Egypt']
+      ]);
+      return U.choice('Which 3D shape is shaped like ' + s[1] + '?', s[0],
+        ['sphere', 'cube', 'cylinder', 'cone', 'pyramid'], {
+          explanation: s[1].charAt(0).toUpperCase() + s[1].slice(1) + ' has the shape of a ' + s[0] + '.'
+        });
+    },
+    faces: function () {
+      var s = U.pick([['cube', 6, 'faces'], ['cube', 12, 'edges'], ['cube', 8, 'corners'],
+                      ['cuboid', 6, 'faces'], ['square-based pyramid', 5, 'faces']]);
+      return U.choice('How many ' + s[2] + ' does a ' + s[0] + ' have?', s[1], [4, 5, 6, 8, 10, 12], {
+        explanation: 'A ' + s[0] + ' has ' + s[1] + ' ' + s[2] + '.'
+      });
+    },
+    perimeter: function () {
+      var a = U.int(4, 20), b = U.int(3, 18), v = 2 * (a + b);
+      return U.choice('A rectangle is ' + a + ' m by ' + b + ' m. What is its perimeter?', v + ' m',
+        [(a * b) + ' m', (a + b) + ' m', (v + 2) + ' m', (2 * a * b) + ' m'], {
+          explanation: 'Perimeter = 2 × (' + a + ' + ' + b + ') = ' + v + ' m.'
+        });
+    },
+    rectArea: function () {
+      var a = U.int(4, 20), b = U.int(3, 18), v = a * b;
+      return U.choice('A rectangle is ' + a + ' cm by ' + b + ' cm. What is its area?', v + ' cm²',
+        [(2 * (a + b)) + ' cm²', (a + b) + ' cm²', (v + a) + ' cm²', (v * 2) + ' cm²'], {
+          explanation: 'Area = length × width = ' + v + ' cm².'
+        });
+    },
+    triArea: function () {
+      var a = U.int(4, 20), b = U.pick([4, 6, 8, 10, 12, 14, 16]), v = a * b / 2;
+      return U.choice('A triangle has base ' + a + ' cm and height ' + b + ' cm. What is its area?', v + ' cm²',
+        [(a * b) + ' cm²', (a + b) + ' cm²', (v + a) + ' cm²', ((a + b) / 2) + ' cm²'], {
+          explanation: 'Area = ½ × base × height = ' + v + ' cm².'
+        });
+    },
+    angles: function () {
+      var a = U.int(30, 80), b = U.int(30, 170 - a), v = 180 - a - b;
+      return U.choice('Two angles of a triangle are ' + a + '° and ' + b + '°. What is the third?', v + '°',
+        [(180 - a) + '°', (360 - a - b) + '°', (v + 10) + '°', (a + b) + '°'], {
+          explanation: 'Angles in a triangle add to 180°: 180 − ' + a + ' − ' + b + ' = ' + v + '°.'
+        });
+    },
+    circle: function () {
+      var r = U.int(2, 12);
+      var wantArea = Math.random() < 0.5;
+      var v = wantArea ? round(Math.PI * r * r) : round(2 * Math.PI * r);
+      return U.choice('A circle has radius ' + r + ' cm. What is its ' + (wantArea ? 'area' : 'circumference') + '? (π ≈ 3.14)',
+        v, [round(wantArea ? 2 * Math.PI * r : Math.PI * r * r), round(Math.PI * r), round(v * 2), round(v / 2)], {
+          explanation: wantArea ? 'Area = πr² = ' + v + ' cm².' : 'Circumference = 2πr = ' + v + ' cm.'
+        });
+    },
+    boxVolume: function () {
+      var a = U.int(2, 10), b = U.int(2, 10), c = U.int(2, 10), v = a * b * c;
+      return U.choice('A box measures ' + a + ' × ' + b + ' × ' + c + ' cm. What is its volume?', v + ' cm³',
+        [(a + b + c) + ' cm³', (a * b) + ' cm³', (2 * (a * b + b * c + a * c)) + ' cm³', (v * 2) + ' cm³'], {
+          explanation: 'Volume = ' + a + ' × ' + b + ' × ' + c + ' = ' + v + ' cm³.'
+        });
+    },
+    pythagoras: function () {
+      var t = U.pick([[3, 4, 5], [6, 8, 10], [5, 12, 13], [9, 12, 15], [8, 15, 17], [7, 24, 25]]);
+      return U.choice('A right triangle has legs ' + t[0] + ' and ' + t[1] + '. How long is the hypotenuse?', t[2],
+        [t[0] + t[1], t[2] + 1, t[2] - 1, t[1] + 2], {
+          explanation: 'a² + b² = c²: ' + (t[0] * t[0]) + ' + ' + (t[1] * t[1]) + ' = ' + (t[2] * t[2]) + ', so c = ' + t[2] + '.'
+        });
+    },
+    cylinder: function () {
+      var r = U.int(2, 8), h = U.int(4, 15);
+      var v = round(Math.PI * r * r * h);
+      return U.choice('A cylinder has radius ' + r + ' cm and height ' + h + ' cm. What is its volume? (π ≈ 3.14)',
+        v + ' cm³', [round(2 * Math.PI * r * h) + ' cm³', round(Math.PI * r * h) + ' cm³', round(v / 3) + ' cm³', round(Math.PI * r * r) + ' cm³'], {
+          explanation: 'Volume = πr²h = 3.14 × ' + (r * r) + ' × ' + h + ' = ' + v + ' cm³.'
+        });
+    },
+    trig: function () {
+      var table = [
+        ['sin', 30, '0.5'], ['cos', 60, '0.5'], ['tan', 45, '1'],
+        ['sin', 90, '1'], ['cos', 0, '1'], ['sin', 0, '0'],
+        ['sin', 45, '0.707'], ['cos', 45, '0.707'], ['cos', 30, '0.866'], ['sin', 60, '0.866']
+      ];
+      var t = U.pick(table);
+      return U.choice('What is ' + t[0] + ' ' + t[1] + '°?', t[2], ['0', '0.5', '0.707', '0.866', '1', '1.732'], {
+        explanation: t[0] + ' ' + t[1] + '° = ' + t[2] + '. These exact values are worth memorising.'
+      });
+    },
+    similar: function () {
+      var k = U.int(2, 5), a = U.int(3, 9), b = U.int(3, 9);
+      var v = b * k;
+      return U.choice('Two similar triangles have matching sides ' + a + ' cm and ' + (a * k) + ' cm. If another side of the small triangle is ' + b + ' cm, how long is the matching side of the large one?',
+        v + ' cm', [(b + k) + ' cm', (b * (k + 1)) + ' cm', (a * k) + ' cm', round(b / k) + ' cm'], {
+          explanation: 'The scale factor is ' + (a * k) + ' ÷ ' + a + ' = ' + k + ', so ' + b + ' × ' + k + ' = ' + v + ' cm.'
+        });
+    }
+  };
+
+  /* =========================== word problems =========================== */
+  var NAMES = ['Maya', 'Leo', 'Amina', 'Wei', 'Jonas', 'Priya', 'Tomas', 'Zara'];
+  var wp = {
+    simpleStory: function () {
+      var name = U.pick(NAMES), a = U.int(3, 12), b = U.int(2, 8);
+      var take = Math.random() < 0.5;
+      var v = take ? a - Math.min(b, a - 1) : a + b;
+      if (take) b = Math.min(b, a - 1);
+      return U.choice(name + ' has ' + a + ' stickers and ' + (take ? 'gives away ' : 'is given ') + b + '. How many now?',
+        v, U.nearby(v, 4), {
+          explanation: a + (take ? ' − ' : ' + ') + b + ' = ' + v + '.'
+        });
+    },
+    sharing: function () {
+      var people = U.int(3, 8), each = U.int(3, 12), left = U.int(1, people - 1);
+      var total = people * each + left;
+      return U.choice(total + ' apples are shared equally between ' + people + ' people. How many are left over?',
+        left, [each, people - left, left + 1, left + 2, 0], {
+          explanation: people + ' × ' + each + ' = ' + (people * each) + ', and ' + total + ' − ' + (people * each) + ' = ' + left + '.'
+        });
+    },
+    money: function () {
+      var name = U.pick(NAMES), price = U.pick([1.25, 2.5, 3, 4.5, 6, 7.5]), qty = U.int(3, 9);
+      var cost = round(price * qty), paid = Math.ceil(cost / 10) * 10, v = round(paid - cost);
+      return U.choice(name + ' buys ' + qty + ' notebooks at $' + price + ' each and pays with $' + paid + '. How much change?',
+        money(v), [money(cost), money(round(v + price)), money(round(paid - price)), money(round(v + 1))], {
+          explanation: 'Cost = ' + qty + ' × ' + price + ' = ' + money(cost) + '. Change = ' + money(v) + '.'
+        });
+    },
+    time: function () {
+      var startH = U.int(1, 10), mins = U.pick([25, 40, 45, 50, 75, 90]);
+      var totalMin = startH * 60 + mins, h = Math.floor(totalMin / 60), m = totalMin % 60;
+      var mm = m < 10 ? '0' + m : m;
+      return U.choice('A film starts at ' + startH + ':00 and runs ' + mins + ' minutes. What time does it end?',
+        h + ':' + mm, [startH + ':' + mins, (h + 1) + ':' + mm, (h - 1) + ':' + mm, h + ':' + ((m + 10) % 60)], {
+          explanation: mins + ' minutes is ' + Math.floor(mins / 60) + 'h ' + (mins % 60) + 'min, so it ends at ' + h + ':' + mm + '.'
+        });
+    },
+    average: function () {
+      var s = [U.int(60, 100), U.int(60, 100), U.int(60, 100)];
+      s[2] += (3 - ((s[0] + s[1] + s[2]) % 3)) % 3;
+      var sum = s[0] + s[1] + s[2], v = sum / 3;
+      return U.choice(U.pick(NAMES) + ' scored ' + s.join(', ') + ' on three tests. What is the mean score?', v, U.nearby(v, 6), {
+        explanation: 'Total ' + sum + ', divided by 3, gives ' + v + '.'
+      });
+    },
+    ratio: function () {
+      var name = U.pick(NAMES), a = U.int(2, 5), b = U.int(2, 5), unit = U.int(4, 12);
+      var total = (a + b) * unit, v = a * unit;
+      return U.choice(name + ' shares ' + total + ' stickers with a friend in the ratio ' + a + ':' + b + '. How many does ' + name + ' get?',
+        v, [b * unit, total - v + 1, Math.round(total / 2), v + unit], {
+          explanation: (a + b) + ' shares in total, so one share is ' + unit + '. ' + name + ' gets ' + a + ' × ' + unit + ' = ' + v + '.'
+        });
+    },
+    rate: function () {
+      var speed = U.pick([40, 50, 60, 70, 80]), hours = U.int(2, 6), v = speed * hours;
+      return U.choice(U.pick(NAMES) + ' cycles at ' + speed + ' km per hour for ' + hours + ' hours. How far do they travel?',
+        v + ' km', [(speed + hours) + ' km', (speed * (hours + 1)) + ' km', Math.round(speed / hours) + ' km', (v - speed) + ' km'], {
+          explanation: 'Distance = speed × time = ' + v + ' km.'
+        });
+    },
+    speedBack: function () {
+      var speed = U.pick([40, 50, 60, 80]), hours = U.int(2, 5), dist = speed * hours;
+      return U.choice('A train covers ' + dist + ' km in ' + hours + ' hours. What is its average speed?',
+        speed + ' km/h', [(dist / (hours + 1)) + ' km/h', (dist * hours) + ' km/h', (speed + 10) + ' km/h', (speed / 2) + ' km/h'], {
+          explanation: 'Speed = distance ÷ time = ' + dist + ' ÷ ' + hours + ' = ' + speed + ' km/h.'
+        });
+    },
+    bestBuy: function () {
+      var priceA = U.pick([2.4, 3.6, 4.8, 6.0]), sizeA = U.pick([4, 6, 8]);
+      var sizeB = sizeA * 2, priceB = round(priceA * 2 * U.pick([0.85, 0.9, 1.1]));
+      var unitA = priceA / sizeA, unitB = priceB / sizeB;
+      var better = unitA < unitB ? 'Pack A' : 'Pack B';
+      var labels = ['Pack A', 'Pack B', 'They cost the same per item'];
+      return {
+        type: 'choice',
+        prompt: 'Pack A: ' + sizeA + ' items for ' + money(priceA) + '. Pack B: ' + sizeB + ' items for ' + money(priceB) + '. Which is better value?',
+        choices: labels, answer: labels.indexOf(better),
+        explanation: 'Per item: A = ' + money(round(unitA)) + ', B = ' + money(round(unitB)) + '.'
+      };
+    },
+    taxTip: function () {
+      var bill = U.pick([40, 60, 80, 120, 150]), pct = U.pick([12, 15, 18, 20]);
+      var v = round(bill * (1 + pct / 100));
+      return U.choice('A meal costs $' + bill + ' and a ' + pct + '% service charge is added. What is the total?',
+        money(v), [money(round(bill * pct / 100)), money(bill + pct), money(round(bill * (1 - pct / 100))), money(round(v + pct))], {
+          explanation: pct + '% of ' + bill + ' is ' + money(round(bill * pct / 100)) + ', giving a total of ' + money(v) + '.'
+        });
+    }
+  };
+
+  /* ---- which question kinds each stage sees ---- */
+  var PLAN = {
+    arithmetic: [
+      ['addSmall', 'subSmall', 'doubles', 'easyTables'],
+      ['add', 'sub', 'mul', 'div', 'easyTables'],
+      ['add', 'sub', 'mul', 'div', 'order', 'negatives', 'factors', 'lcmQ'],
+      ['order', 'negatives', 'factors', 'lcmQ', 'indices', 'standardForm', 'sigFigs'],
+      ['indices', 'standardForm', 'sigFigs', 'surds', 'factors', 'lcmQ']
+    ],
+    fractions: [
+      ['halves', 'fractionOf'],
+      ['halves', 'fractionOf', 'simplify', 'addSame', 'toDecimal'],
+      ['simplify', 'addSame', 'addDiff', 'toDecimal', 'percentOf', 'compare'],
+      ['addDiff', 'multiply', 'divide', 'percentOf', 'percentChange', 'compare'],
+      ['multiply', 'divide', 'percentChange', 'reversePercent', 'compound']
+    ],
+    algebra: [
+      ['missing'],
+      ['missing', 'linear', 'sequence'],
+      ['linear', 'twoStep', 'simplify', 'sequence', 'evaluate'],
+      ['twoStep', 'simplify', 'expand', 'factorise', 'evaluate', 'nthTerm'],
+      ['expand', 'factorise', 'nthTerm', 'quadratic', 'simultaneous', 'rearrange']
+    ],
+    geometry: [
+      ['shapes', 'corners', 'solids', 'faces'],
+      ['shapes', 'solids', 'faces', 'perimeter', 'rectArea', 'triArea'],
+      ['perimeter', 'rectArea', 'triArea', 'angles', 'boxVolume'],
+      ['triArea', 'angles', 'circle', 'boxVolume', 'pythagoras'],
+      ['circle', 'pythagoras', 'cylinder', 'trig', 'similar']
+    ],
+    word: [
+      ['simpleStory'],
+      ['simpleStory', 'sharing', 'money', 'time'],
+      ['sharing', 'money', 'time', 'average', 'ratio', 'rate'],
+      ['average', 'ratio', 'rate', 'speedBack', 'bestBuy', 'taxTip'],
+      ['rate', 'speedBack', 'bestBuy', 'taxTip', 'ratio']
+    ]
+  };
+
+  function topicGenerator(pool, planKey) {
+    return function (n, stageIndex) {
+      var kinds = PLAN[planKey][stageIndex == null ? 2 : stageIndex];
+      var out = [], seen = {}, guard = 0;
+      while (out.length < n && guard++ < n * 40) {
+        var q = pool[U.pick(kinds)]();
+        if (!q || seen[q.prompt]) continue;
+        // a random draw can collapse distractors onto the answer; skip those rather than show a one-option question
+        if (q.type === 'choice' && q.choices.length < 3) continue;
+        seen[q.prompt] = true;
+        out.push(q);
+      }
+      return out;
+    };
+  }
+
+  SH.register({
+    id: 'math',
+    name: 'Math',
+    native: '',
+    emoji: '🔢',
+    color: 'var(--math)',
+    blurb: 'Number, fractions, algebra, geometry and problem solving — generated fresh at your level.',
+    topics: [
+      { id: 'arithmetic', name: 'Number & Arithmetic', desc: 'Counting and calculating, up to indices and standard form',
+        stageDesc: ['Adding and taking away within 20', 'Column methods and times tables', 'Negatives, order of operations, factors', 'Indices, standard form, significant figures', 'Surds, index laws, precision'],
+        generate: topicGenerator(arith, 'arithmetic') },
+      { id: 'fractions', name: 'Fractions, Decimals & Percents', desc: 'From halving to compound interest',
+        stageDesc: ['Halves and simple fractions of amounts', 'Simplifying and adding fractions', 'Percentages and comparisons', 'Multiplying, dividing, percentage change', 'Reverse percentages and compound growth'],
+        generate: topicGenerator(fr, 'fractions') },
+      { id: 'algebra', name: 'Algebra', desc: 'Missing numbers through to quadratics',
+        stageDesc: ['Missing-number puzzles', 'Simple equations and patterns', 'Two-step equations and sequences', 'Expanding, factorising, nth term', 'Quadratics, simultaneous equations, rearranging'],
+        generate: topicGenerator(alg, 'algebra') },
+      { id: 'geometry', name: 'Shape & Geometry', desc: 'Shapes, area, angles, Pythagoras, trigonometry',
+        stageDesc: ['Naming shapes and counting sides', 'Perimeter and area', 'Angles and volume', 'Circles and Pythagoras', 'Trigonometry and similar shapes'],
+        generate: topicGenerator(geo, 'geometry') },
+      { id: 'word', name: 'Problem Solving', desc: 'Real situations: money, time, rates, value',
+        stageDesc: ['Simple stories with adding and taking away', 'Money, time and sharing', 'Averages, ratio and rates', 'Speed, best value, service charges', 'Multi-step rate and money problems'],
+        generate: topicGenerator(wp, 'word') }
+    ]
+  });
+})(window.StudyHub);
+</script>
+<script>
+/* Science — biology, chemistry, physics, earth & space, and how science is actually done. */
+(function (SH) {
+  'use strict';
+  var U = SH.U;
+
+  /* Each item: [question, [options — first one is correct], explanation] */
+  var BIOLOGY = [
+    ['Which of these is a living thing?', ['A tree', 'A rock', 'A cloud', 'A spoon'], 'Living things grow, feed and reproduce. A tree does; a rock does not.', 1],
+    ['What do humans breathe in to stay alive?', ['Oxygen', 'Carbon dioxide', 'Helium', 'Smoke'], 'We take oxygen from the air into our lungs.', 1],
+    ['Which body part do you use to smell?', ['Nose', 'Ear', 'Elbow', 'Knee'], 'The nose contains cells that detect smells.', 1],
+    ['What do plants need to grow?', ['Water, light and air', 'Only sand', 'Only darkness', 'Only ice'], 'Plants need water, light, air and nutrients from soil.', 1],
+    ['A baby frog is called a...', ['Tadpole', 'Puppy', 'Calf', 'Chick'], 'Frogs hatch as tadpoles and grow legs later.', 1],
+    ['Which animal is a mammal?', ['Dog', 'Snake', 'Frog', 'Goldfish'], 'Mammals have fur and feed their young milk.', 1],
+    ['Where do fish live?', ['In water', 'In trees', 'Underground', 'In clouds'], 'Fish use gills to take oxygen from water.', 1],
+    ['What happens to a seed when you water it and give it light?', ['It grows into a plant', 'It turns into a stone', 'It disappears', 'It becomes an animal'], 'Seeds germinate and grow into new plants.', 1],
+    ['Which organelle releases most of a cell\'s usable energy?', ['Mitochondrion', 'Ribosome', 'Nucleus', 'Golgi body'], 'Mitochondria carry out aerobic respiration, producing ATP.', 2],
+    ['What do plants use to capture light during photosynthesis?', ['Chlorophyll', 'Haemoglobin', 'Keratin', 'Insulin'], 'Chlorophyll in the chloroplasts absorbs light, mainly red and blue wavelengths.', 2],
+    ['Which gas do plants take in for photosynthesis?', ['Carbon dioxide', 'Oxygen', 'Nitrogen', 'Methane'], 'Plants take in CO₂ and release oxygen as a by-product.', 1],
+    ['What carries genetic instructions in almost every living cell?', ['DNA', 'ATP', 'Glucose', 'Collagen'], 'DNA stores the sequence that codes for proteins.', 2],
+    ['Which blood cells carry oxygen around the body?', ['Red blood cells', 'White blood cells', 'Platelets', 'Plasma cells'], 'Red blood cells contain haemoglobin, which binds oxygen.', 1],
+    ['What is the basic unit of life?', ['The cell', 'The atom', 'The organ', 'The molecule'], 'All living things are made of one or more cells.', 1],
+    ['Which system removes waste from the blood?', ['The kidneys', 'The lungs alone', 'The liver alone', 'The pancreas'], 'The kidneys filter blood and produce urine.', 2],
+    ['A food chain always begins with a...', ['Producer', 'Herbivore', 'Predator', 'Decomposer'], 'Producers such as plants make their own food from sunlight.', 1],
+    ['What is the role of enzymes?', ['They speed up reactions in living things', 'They store genetic code', 'They carry oxygen', 'They build cell walls'], 'Enzymes are biological catalysts; they lower activation energy.', 3],
+    ['Which process do cells use to divide for growth and repair?', ['Mitosis', 'Meiosis', 'Osmosis', 'Digestion'], 'Mitosis produces two genetically identical cells.', 3],
+    ['Osmosis is the movement of...', ['Water across a partially permeable membrane', 'Salt through a pipe', 'Oxygen through the lungs', 'Sugar into the blood'], 'Water moves from a dilute to a more concentrated solution.', 3],
+    ['Which part of a plant absorbs water and minerals?', ['The roots', 'The leaves', 'The flower', 'The stem tip'], 'Root hair cells give a large surface area for absorption.', 1],
+    ['What does the skeleton NOT do?', ['Produce insulin', 'Support the body', 'Protect organs', 'Make blood cells'], 'Insulin is produced by the pancreas, not by bone.', 2],
+    ['Vertebrates are animals that have...', ['A backbone', 'Wings', 'Cold blood', 'Six legs'], 'Vertebrates include fish, amphibians, reptiles, birds and mammals.', 1],
+    ['Natural selection means that...', ['Individuals better suited to their environment tend to survive and reproduce', 'Animals choose their own traits', 'All mutations are helpful', 'Species never change'], 'Advantageous variations become more common over generations.', 3],
+    ['Which organ pumps blood around the body?', ['The heart', 'The lungs', 'The spleen', 'The liver'], 'The heart is a muscular double pump.', 1],
+    ['Bacteria differ from animal cells because bacteria have...', ['No nucleus', 'No DNA', 'No cell membrane', 'No ribosomes'], 'Bacteria are prokaryotes: their DNA floats free in the cytoplasm.', 3],
+    ['What is a habitat?', ['The place where an organism lives', 'The food an animal eats', 'A group of the same species', 'The role a species plays'], 'The habitat is the physical environment an organism occupies.', 1],
+    ['Which of these is a decomposer?', ['Fungi', 'Grass', 'Rabbit', 'Hawk'], 'Fungi and many bacteria break down dead material and recycle nutrients.', 2],
+    ['Why do we breathe out more carbon dioxide than we breathe in?', ['Respiration produces it as waste', 'The lungs manufacture it', 'It comes from food in the stomach', 'Air contains none of it'], 'Aerobic respiration releases CO₂ as a waste product.', 2]
+  ];
+
+  var CHEMISTRY = [
+    ['What happens to ice when it gets warm?', ['It melts into water', 'It turns into wood', 'It becomes heavier', 'It disappears forever'], 'Heating a solid gives its particles enough energy to melt.', 1],
+    ['Which of these is a liquid?', ['Milk', 'A brick', 'A pencil', 'A coin'], 'Liquids flow and take the shape of their container.', 1],
+    ['What do we call water when it turns into a gas?', ['Steam', 'Ice', 'Snow', 'Frost'], 'Boiling water evaporates into steam, a gas.', 1],
+    ['Salt in water will...', ['Dissolve', 'Float on top forever', 'Turn into sand', 'Become a gas'], 'Salt dissolves to make a solution.', 1],
+    ['Which of these will a magnet attract?', ['A steel paperclip', 'A plastic straw', 'A paper cup', 'A wooden block'], 'Magnets attract iron and steel, not plastic or wood.', 1],
+    ['Which material lets light pass through it?', ['Glass', 'Wood', 'Metal', 'Cardboard'], 'Glass is transparent, so light passes through.', 1],
+    ['The three states of matter are...', ['Solid, liquid and gas', 'Hot, warm and cold', 'Big, medium and small', 'Wet, dry and damp'], 'Everyday matter is solid, liquid or gas.', 1],
+    ['What is water made of?', ['Hydrogen and oxygen', 'Salt and sand', 'Iron and carbon', 'Only oxygen'], 'A water molecule is H₂O: two hydrogen atoms and one oxygen atom.', 1],
+    ['What is the chemical formula for water?', ['H₂O', 'CO₂', 'O₂', 'H₂O₂'], 'Two hydrogen atoms bonded to one oxygen atom.', 1],
+    ['Which particle in an atom carries a negative charge?', ['Electron', 'Proton', 'Neutron', 'Nucleus'], 'Electrons orbit the nucleus and carry a −1 charge.', 2],
+    ['The atomic number of an element tells you the number of...', ['Protons', 'Neutrons', 'Electron shells', 'Isotopes'], 'The atomic number is the proton count, which defines the element.', 3],
+    ['What is a compound?', ['Two or more elements chemically bonded together', 'Two elements mixed but not bonded', 'A single type of atom', 'Any liquid'], 'A mixture can be separated physically; a compound cannot.', 2],
+    ['A pH of 3 means a substance is...', ['Acidic', 'Alkaline', 'Neutral', 'A gas'], 'Below 7 is acidic, 7 is neutral, above 7 is alkaline.', 2],
+    ['What happens to particles when a solid melts?', ['They gain energy and move past each other', 'They stop moving', 'They lose mass', 'They break into atoms'], 'Melting gives particles enough energy to escape fixed positions.', 2],
+    ['Which gas makes up about 78% of the air?', ['Nitrogen', 'Oxygen', 'Carbon dioxide', 'Argon'], 'Air is roughly 78% nitrogen and 21% oxygen.', 2],
+    ['What is the name of the reaction between an acid and a base?', ['Neutralisation', 'Combustion', 'Oxidation', 'Electrolysis'], 'Acid + base → salt + water.', 3],
+    ['In a chemical reaction, mass is...', ['Conserved', 'Always lost', 'Always gained', 'Converted into heat'], 'Atoms are rearranged, never created or destroyed.', 3],
+    ['Which method separates a dissolved solid from its solvent?', ['Evaporation', 'Filtration', 'Decanting', 'Sieving'], 'Filtration only removes undissolved solids.', 2],
+    ['What does a catalyst do?', ['Speeds up a reaction without being used up', 'Slows a reaction permanently', 'Turns solids into gases', 'Adds mass to the products'], 'It provides an alternative route with lower activation energy.', 3],
+    ['The rows of the periodic table are called...', ['Periods', 'Groups', 'Families', 'Series'], 'Vertical columns are groups; horizontal rows are periods.', 3],
+    ['Elements in the same group of the periodic table have...', ['Similar chemical properties', 'The same mass', 'The same number of neutrons', 'The same colour'], 'They share the same number of outer-shell electrons.', 3],
+    ['What is combustion?', ['A reaction with oxygen that releases energy', 'A reaction that absorbs light', 'Freezing of a liquid', 'The splitting of an atom'], 'Burning fuel in oxygen produces heat, and usually CO₂ and water.', 2],
+    ['Which of these is a physical change?', ['Ice melting', 'Wood burning', 'Iron rusting', 'Baking a cake'], 'A physical change is reversible and forms no new substance.', 1],
+    ['What is an isotope?', ['An atom with the same protons but a different number of neutrons', 'A charged atom', 'A different element', 'A type of molecule'], 'Isotopes share chemistry but differ in mass.', 3],
+    ['NaCl is the formula for...', ['Table salt', 'Baking soda', 'Sugar', 'Chalk'], 'Sodium chloride, an ionic compound.', 1],
+    ['An ion is an atom that has...', ['Gained or lost electrons', 'Gained protons', 'Lost its nucleus', 'Been heated'], 'Losing electrons gives a positive ion; gaining them gives a negative ion.', 3],
+    ['Which state of matter has a fixed volume but no fixed shape?', ['Liquid', 'Solid', 'Gas', 'Plasma'], 'Liquids take the shape of their container but keep their volume.', 1],
+    ['Rusting requires iron plus...', ['Oxygen and water', 'Nitrogen and heat', 'Carbon and salt', 'Light alone'], 'Rust is hydrated iron(III) oxide.', 2]
+  ];
+
+  var PHYSICS = [
+    ['What makes a ball fall back down when you throw it up?', ['Gravity', 'Wind', 'Sound', 'Light'], 'Gravity pulls objects towards the Earth.', 1],
+    ['Which of these makes a sound?', ['A vibrating guitar string', 'A still rock', 'A drawing', 'A shadow'], 'Sound is made by something vibrating.', 1],
+    ['A shadow forms when...', ['An object blocks light', 'The Sun goes out', 'Air moves', 'Water freezes'], 'Light travels in straight lines and cannot pass through solid objects.', 1],
+    ['Which surface makes it hardest to slide a box?', ['Rough carpet', 'Smooth ice', 'Polished wood', 'Wet glass'], 'Rough surfaces create more friction.', 1],
+    ['What do we use a battery for?', ['To supply electrical energy', 'To make things colder', 'To create gravity', 'To block sound'], 'A battery pushes charge around a circuit.', 1],
+    ['Which of these floats in water?', ['A cork', 'A stone', 'A metal spoon', 'A brick'], 'Objects less dense than water float.', 1],
+    ['A push or a pull is called a...', ['Force', 'Mass', 'Colour', 'Sound'], 'Forces can change an object\'s speed, direction or shape.', 1],
+    ['What happens to a bulb when you break the circuit?', ['It goes out', 'It shines brighter', 'It changes colour', 'Nothing changes'], 'Current needs a complete loop to flow.', 1],
+    ['What is the SI unit of force?', ['Newton', 'Joule', 'Watt', 'Pascal'], 'One newton accelerates 1 kg by 1 m/s².', 2],
+    ['Speed is calculated as...', ['Distance ÷ time', 'Time ÷ distance', 'Distance × time', 'Force ÷ mass'], 'Speed = distance travelled per unit time.', 2],
+    ['Which force pulls objects towards the Earth?', ['Gravity', 'Friction', 'Magnetism', 'Upthrust'], 'Gravity acts between any two masses.', 1],
+    ['What does an object\'s acceleration depend on?', ['The resultant force and its mass', 'Its colour', 'Its volume only', 'Its temperature'], 'a = F ÷ m, from Newton\'s second law.', 3],
+    ['Energy can be...', ['Transferred but not created or destroyed', 'Created by machines', 'Destroyed by friction', 'Made from nothing'], 'This is the law of conservation of energy.', 2],
+    ['A ball held above the ground has which store of energy?', ['Gravitational potential', 'Kinetic', 'Thermal', 'Nuclear'], 'Raising an object stores energy in the gravity field.', 2],
+    ['Which of these is a good conductor of electricity?', ['Copper', 'Rubber', 'Glass', 'Dry wood'], 'Metals have free electrons that carry charge.', 1],
+    ['In a series circuit, the current...', ['Is the same everywhere', 'Splits between components', 'Is zero', 'Increases along the loop'], 'There is only one path, so the same current flows through each component.', 3],
+    ['What is the unit of electrical resistance?', ['Ohm', 'Volt', 'Amp', 'Coulomb'], 'Resistance in ohms = voltage ÷ current.', 3],
+    ['Light travels fastest through...', ['A vacuum', 'Water', 'Glass', 'Diamond'], 'Any medium slows light down; a vacuum does not.', 2],
+    ['What happens to a light ray entering glass at an angle?', ['It bends towards the normal', 'It bends away from the normal', 'It stops', 'It reflects completely'], 'Refraction bends light towards the normal in a denser medium.', 3],
+    ['Sound cannot travel through...', ['A vacuum', 'Air', 'Water', 'Steel'], 'Sound needs particles to vibrate; a vacuum has none.', 2],
+    ['The pitch of a sound depends on its...', ['Frequency', 'Amplitude', 'Speed', 'Volume'], 'Higher frequency means higher pitch; amplitude sets loudness.', 2],
+    ['Friction between surfaces usually produces...', ['Heat', 'Light only', 'Electricity', 'Sound only'], 'Work done against friction is transferred to thermal energy.', 1],
+    ['Weight is best described as...', ['The force of gravity on a mass', 'The amount of matter in an object', 'The same everywhere in the universe', 'Measured in kilograms'], 'Mass is measured in kg; weight is a force in newtons.', 3],
+    ['Which of these is a renewable energy source?', ['Wind', 'Coal', 'Natural gas', 'Crude oil'], 'Wind is replenished continuously; fossil fuels are not.', 1],
+    ['Power is...', ['Energy transferred per second', 'Force times distance', 'Mass times speed', 'Voltage times resistance'], 'Power in watts = joules per second.', 3],
+    ['A magnet\'s field is strongest at its...', ['Poles', 'Centre', 'Surface only', 'North side only'], 'Field lines are most concentrated at the poles.', 1],
+    ['What keeps a satellite in orbit?', ['Gravity acting as a centripetal force', 'Its engines firing constantly', 'Air pressure', 'Magnetism'], 'Gravity continually pulls the satellite towards Earth, curving its path.', 3],
+    ['If you double the speed of a moving object, its kinetic energy...', ['Quadruples', 'Doubles', 'Halves', 'Stays the same'], 'KE = ½mv², so energy scales with the square of speed.', 3]
+  ];
+
+  var EARTH = [
+    ['Which object gives the Earth its light and heat?', ['The Sun', 'The Moon', 'A star called Sirius', 'A comet'], 'The Sun is our nearest star.', 1],
+    ['How many days are there in a week?', ['7', '5', '10', '12'], 'A week has seven days.', 1],
+    ['What falls from clouds as rain?', ['Water', 'Sand', 'Rocks', 'Air'], 'Clouds hold tiny water droplets that join and fall as rain.', 1],
+    ['Which season usually comes after winter?', ['Spring', 'Autumn', 'Summer', 'Winter again'], 'The order is winter, spring, summer, autumn.', 1],
+    ['What do we call the Earth\'s natural satellite?', ['The Moon', 'Mars', 'The Sun', 'Venus'], 'The Moon orbits the Earth about once a month.', 1],
+    ['Which of these is a source of water?', ['A river', 'A pavement', 'A brick wall', 'A lamp'], 'Rivers, lakes, seas and rain are sources of water.', 1],
+    ['Day and night happen because...', ['The Earth spins', 'The Sun switches off', 'Clouds cover the Sun', 'The Moon blocks light'], 'The Earth turns once every 24 hours.', 1],
+    ['What is soil mostly made of?', ['Tiny bits of rock and dead plant material', 'Pure water', 'Plastic', 'Metal'], 'Soil forms as rock breaks down and organic matter builds up.', 1],
+    ['Which layer of the Earth do we live on?', ['The crust', 'The mantle', 'The outer core', 'The inner core'], 'The crust is a thin, rigid outer shell.', 1],
+    ['Earthquakes are mostly caused by...', ['Movement at tectonic plate boundaries', 'Ocean waves', 'The Moon\'s heat', 'Falling meteorites'], 'Stress builds along faults and is released suddenly.', 2],
+    ['Which rock type forms from cooled magma?', ['Igneous', 'Sedimentary', 'Metamorphic', 'Organic'], 'Igneous rocks crystallise from molten rock.', 2],
+    ['What drives the water cycle?', ['Energy from the Sun', 'The Earth\'s core', 'Volcanoes', 'Tides'], 'Solar energy evaporates water, which later condenses and falls as rain.', 2],
+    ['Which planet is closest to the Sun?', ['Mercury', 'Venus', 'Earth', 'Mars'], 'Mercury orbits at about 58 million km.', 1],
+    ['Why do we have seasons?', ['The Earth\'s axis is tilted', 'The Earth moves closer to the Sun in summer', 'The Sun changes brightness', 'The Moon blocks sunlight'], 'The 23.5° tilt changes how directly sunlight strikes each hemisphere.', 2],
+    ['How long does light from the Sun take to reach Earth?', ['About 8 minutes', 'About 8 seconds', 'About 8 hours', 'Instantly'], 'Light covers 150 million km in roughly 500 seconds.', 3],
+    ['What causes tides on Earth?', ['The gravitational pull of the Moon and Sun', 'Wind alone', 'The Earth\'s magnetic field', 'Underwater volcanoes'], 'The Moon\'s pull dominates; the Sun adds to it at spring tides.', 2],
+    ['Which gas in the atmosphere protects us from ultraviolet radiation?', ['Ozone', 'Nitrogen', 'Helium', 'Hydrogen'], 'Ozone (O₃) in the stratosphere absorbs most UV-B.', 3],
+    ['Fossils are most often found in which rock?', ['Sedimentary', 'Igneous', 'Metamorphic', 'Volcanic glass'], 'Sediment buries remains gently, preserving them in layers.', 2],
+    ['A galaxy is...', ['A vast collection of stars, gas and dust', 'A single large star', 'A group of planets', 'A type of comet'], 'The Milky Way contains a few hundred billion stars.', 2],
+    ['What is the Moon\'s phase called when it is fully lit?', ['Full moon', 'New moon', 'Crescent', 'Eclipse'], 'The whole sunlit side faces Earth at full moon.', 1],
+    ['Which of these greenhouse gases is released mainly by burning fossil fuels?', ['Carbon dioxide', 'Neon', 'Argon', 'Krypton'], 'Combustion of carbon-based fuels releases CO₂.', 2],
+    ['Weather differs from climate because weather is...', ['Short-term conditions', 'A 30-year average', 'Only about temperature', 'The same everywhere'], 'Climate is the long-term pattern of weather.', 3],
+    ['What is the largest planet in the Solar System?', ['Jupiter', 'Saturn', 'Neptune', 'Earth'], 'Jupiter is more than 300 times Earth\'s mass.', 1],
+    ['Volcanoes most commonly form...', ['Near tectonic plate boundaries', 'In the middle of flat plains', 'Only under ice', 'Where rivers meet'], 'Magma rises where plates diverge or one subducts beneath another.', 2],
+    ['Which process breaks rock down in place, without moving it?', ['Weathering', 'Erosion', 'Deposition', 'Subduction'], 'Erosion transports material; weathering breaks it down where it sits.', 3],
+    ['A star like the Sun produces energy by...', ['Nuclear fusion of hydrogen into helium', 'Burning coal', 'Nuclear fission of uranium', 'Chemical reactions'], 'Fusion in the core converts mass into energy.', 3],
+    ['Roughly what percentage of the Earth\'s surface is ocean?', ['About 71%', 'About 30%', 'About 50%', 'About 90%'], 'Oceans cover roughly 71% of the surface.', 1],
+    ['Which instrument measures air pressure?', ['Barometer', 'Thermometer', 'Anemometer', 'Hygrometer'], 'An anemometer measures wind speed; a hygrometer measures humidity.', 3]
+  ];
+
+  var METHOD = [
+    ['Before you start an experiment you should...', ['Predict what you think will happen', 'Write the conclusion first', 'Change every variable', 'Throw away the equipment'], 'A prediction gives you something to test.', 1],
+    ['Which tool would you use to measure temperature?', ['A thermometer', 'A ruler', 'A stopwatch', 'A balance'], 'Thermometers measure how hot or cold something is.', 1],
+    ['If you measure something three times, you should...', ['Compare the results and look for odd ones', 'Only keep the biggest', 'Only keep the smallest', 'Ignore them all'], 'Repeats help you spot mistakes.', 1],
+    ['Recording your results carefully is important because...', ['Others need to check and repeat your work', 'It makes the page look nice', 'It is faster than thinking', 'It changes the answer'], 'Science depends on results other people can check.', 1],
+    ['A hypothesis is best described as...', ['A testable prediction', 'A proven fact', 'A random guess', 'The final conclusion'], 'A hypothesis must be capable of being shown wrong.', 2],
+    ['In an experiment, the variable you deliberately change is the...', ['Independent variable', 'Dependent variable', 'Control variable', 'Constant'], 'You change the independent variable and measure the dependent one.', 2],
+    ['Why do scientists use a control group?', ['To compare against the group receiving the treatment', 'To increase the sample size', 'To speed up the experiment', 'To avoid measuring anything'], 'The control shows what happens without the change being tested.', 2],
+    ['Repeating an experiment several times mainly improves...', ['Reliability', 'The hypothesis', 'The units used', 'The equipment cost'], 'Repeats reveal random error and let you spot anomalies.', 2],
+    ['A result that does not fit the pattern of the others is called...', ['An anomaly', 'A control', 'A constant', 'A conclusion'], 'Anomalies should be investigated, not silently deleted.', 3],
+    ['Which of these makes a conclusion stronger?', ['Independent replication by other researchers', 'A larger font in the report', 'A famous author', 'A confident tone'], 'Reproducibility is the core test of a scientific claim.', 3],
+    ['Accuracy means how close a measurement is to...', ['The true value', 'Other measurements', 'The mean of your results', 'Zero'], 'Precision is about consistency; accuracy is about correctness.', 3],
+    ['If two things rise together, you can conclude...', ['They are correlated, which does not prove cause', 'One definitely causes the other', 'Both are false', 'Nothing can ever be learned'], 'Correlation may come from a third factor or coincidence.', 3],
+    ['A fair test requires that...', ['Only one variable changes at a time', 'Every variable changes', 'No measurements are taken', 'The result is known in advance'], 'Otherwise you cannot tell which change caused the effect.', 1],
+    ['Peer review is the process of...', ['Other experts checking work before publication', 'The public voting on results', 'Repeating an experiment yourself', 'Writing a summary'], 'Reviewers check method, analysis and reasoning.', 3],
+    ['Which graph best shows how one measurement changes over time?', ['A line graph', 'A pie chart', 'A Venn diagram', 'A photograph'], 'Line graphs show continuous change against a continuous variable.', 1],
+    ['What should you do with an unexpected result?', ['Investigate and repeat the measurement', 'Delete it quietly', 'Change the hypothesis to fit it without checking', 'Ignore the whole experiment'], 'Unexpected results are often where new understanding starts.', 1],
+    ['A theory in science is...', ['A well-tested explanation supported by evidence', 'A wild guess', 'The same as a hypothesis', 'An opinion'], 'Everyday "theory" means guess; scientific theory means the opposite.', 3],
+    ['Which is the most precise measurement of length?', ['12.45 cm', '12 cm', 'about 12 cm', 'over 10 cm'], 'More significant figures means a finer resolution.', 2],
+    ['Bias in an experiment means...', ['Something systematically pushes results in one direction', 'The results are random', 'The sample is too large', 'The units are wrong'], 'Blinding and randomisation help reduce bias.', 3]
+  ];
+
+  function bank(items, kicker) {
+    return function (n, stage) {
+      return U.sample(U.forStage(items, stage), n).map(function (it) {
+        var correct = it[1][0];
+        var options = U.shuffle(it[1]);
+        return {
+          type: 'choice',
+          kicker: kicker,
+          prompt: it[0],
+          choices: options,
+          answer: options.indexOf(correct),
+          explanation: it[2]
+        };
+      });
+    };
+  }
+
+  function mixed(n, stage) {
+    var all = BIOLOGY.concat(CHEMISTRY, PHYSICS, EARTH, METHOD);
+    return bank(all, 'mixed review')(n, stage);
+  }
+
+  SH.register({
+    id: 'science',
+    name: 'Science',
+    native: '',
+    emoji: '🔬',
+    color: 'var(--science)',
+    blurb: 'Life, materials, forces, the planet and how experiments work.',
+    topics: [
+      { id: 'biology', name: 'Biology', desc: 'Cells, bodies, plants and ecosystems', generate: bank(BIOLOGY, 'biology') },
+      { id: 'chemistry', name: 'Chemistry', desc: 'Atoms, reactions, states and the periodic table', generate: bank(CHEMISTRY, 'chemistry') },
+      { id: 'physics', name: 'Physics', desc: 'Forces, energy, electricity, light and sound', generate: bank(PHYSICS, 'physics') },
+      { id: 'earth', name: 'Earth & Space', desc: 'Rocks, weather, the Solar System and beyond', generate: bank(EARTH, 'earth & space') },
+      { id: 'method', name: 'Scientific Method', desc: 'Variables, controls, evidence and reasoning', generate: bank(METHOD, 'method') },
+      { id: 'mixed', name: 'Mixed Review', desc: 'Everything above, shuffled together', generate: mixed }
+    ]
+  });
+})(window.StudyHub);
+</script>
+<script>
+/* Chinese (Mandarin, simplified) — characters, pinyin, meaning, numbers, phrases and grammar. */
+(function (SH) {
+  'use strict';
+  var U = SH.U;
+
+  /* [hanzi, pinyin, english] */
+  var VOCAB = [
+    ['我', 'wǒ', 'I; me', 1], ['你', 'nǐ', 'you', 1], ['他', 'tā', 'he; him', 1], ['她', 'tā', 'she; her', 1],
+    ['我们', 'wǒmen', 'we; us', 1], ['好', 'hǎo', 'good; well', 1], ['是', 'shì', 'to be', 1], ['不', 'bù', 'not', 1],
+    ['在', 'zài', 'at; in; to be located', 1], ['有', 'yǒu', 'to have; there is', 1], ['人', 'rén', 'person', 1],
+    ['大', 'dà', 'big', 1], ['小', 'xiǎo', 'small', 1], ['中国', 'Zhōngguó', 'China', 1], ['学', 'xué', 'to study', 1],
+    ['老师', 'lǎoshī', 'teacher', 1], ['学生', 'xuésheng', 'student', 1], ['朋友', 'péngyou', 'friend', 1],
+    ['家', 'jiā', 'home; family', 1], ['爸爸', 'bàba', 'father', 1], ['妈妈', 'māma', 'mother', 1],
+    ['儿子', 'érzi', 'son', 1], ['女儿', 'nǚ\'ér', 'daughter', 1], ['名字', 'míngzi', 'name', 1],
+    ['什么', 'shénme', 'what', 1], ['谁', 'shéi', 'who', 1], ['哪儿', 'nǎr', 'where', 1], ['怎么', 'zěnme', 'how', 1],
+    ['为什么', 'wèishénme', 'why', 2], ['多少', 'duōshao', 'how many; how much', 2],
+    ['今天', 'jīntiān', 'today', 1], ['明天', 'míngtiān', 'tomorrow', 1], ['昨天', 'zuótiān', 'yesterday', 1],
+    ['现在', 'xiànzài', 'now', 1], ['年', 'nián', 'year', 1], ['月', 'yuè', 'month; moon', 1], ['星期', 'xīngqī', 'week', 1],
+    ['点', 'diǎn', 'o\'clock; dot', 2], ['分钟', 'fēnzhōng', 'minute', 2],
+    ['吃', 'chī', 'to eat', 1], ['喝', 'hē', 'to drink', 1], ['水', 'shuǐ', 'water', 1], ['茶', 'chá', 'tea', 1],
+    ['米饭', 'mǐfàn', 'cooked rice', 2], ['菜', 'cài', 'dish; vegetable', 2], ['苹果', 'píngguǒ', 'apple', 1],
+    ['说', 'shuō', 'to speak', 1], ['看', 'kàn', 'to look; to watch', 1], ['听', 'tīng', 'to listen', 1],
+    ['写', 'xiě', 'to write', 1], ['读', 'dú', 'to read', 1], ['买', 'mǎi', 'to buy', 2], ['卖', 'mài', 'to sell', 2],
+    ['去', 'qù', 'to go', 1], ['来', 'lái', 'to come', 1], ['回', 'huí', 'to return', 1], ['住', 'zhù', 'to live; to stay', 2],
+    ['工作', 'gōngzuò', 'work; to work', 2], ['喜欢', 'xǐhuan', 'to like', 2], ['爱', 'ài', 'to love', 1],
+    ['想', 'xiǎng', 'to want; to think', 2], ['会', 'huì', 'can (learned skill)', 2], ['能', 'néng', 'can (be able to)', 2],
+    ['可以', 'kěyǐ', 'may; be allowed to', 2], ['很', 'hěn', 'very', 1], ['太', 'tài', 'too (excessively)', 2],
+    ['也', 'yě', 'also', 2], ['都', 'dōu', 'all; both', 2], ['和', 'hé', 'and; with', 1],
+    ['书', 'shū', 'book', 1], ['学校', 'xuéxiào', 'school', 2], ['医院', 'yīyuàn', 'hospital', 3],
+    ['商店', 'shāngdiàn', 'shop', 2], ['饭店', 'fàndiàn', 'restaurant', 2], ['火车站', 'huǒchēzhàn', 'train station', 3],
+    ['飞机', 'fēijī', 'aeroplane', 2], ['出租车', 'chūzūchē', 'taxi', 3], ['电脑', 'diànnǎo', 'computer', 2],
+    ['电视', 'diànshì', 'television', 2], ['电话', 'diànhuà', 'telephone', 2], ['钱', 'qián', 'money', 2],
+    ['天气', 'tiānqì', 'weather', 2], ['冷', 'lěng', 'cold', 1], ['热', 'rè', 'hot', 1], ['下雨', 'xiàyǔ', 'to rain', 2],
+    ['猫', 'māo', 'cat', 1], ['狗', 'gǒu', 'dog', 1], ['东西', 'dōngxi', 'thing; stuff', 2],
+    ['高兴', 'gāoxìng', 'happy; glad', 2], ['漂亮', 'piàoliang', 'pretty', 3], ['新', 'xīn', 'new', 1],
+    ['老', 'lǎo', 'old', 1], ['快', 'kuài', 'fast', 1], ['慢', 'màn', 'slow', 1], ['多', 'duō', 'many', 1], ['少', 'shǎo', 'few', 1]
+  ];
+
+  /* [hanzi, pinyin, english] */
+  var PHRASES = [
+    ['你好', 'nǐ hǎo', 'Hello', 1],
+    ['谢谢', 'xièxie', 'Thank you', 1],
+    ['不客气', 'bú kèqi', 'You\'re welcome', 2],
+    ['对不起', 'duìbuqǐ', 'Sorry', 1],
+    ['没关系', 'méi guānxi', 'It\'s all right', 2],
+    ['再见', 'zàijiàn', 'Goodbye', 1],
+    ['请问', 'qǐngwèn', 'Excuse me, may I ask...', 2],
+    ['早上好', 'zǎoshang hǎo', 'Good morning', 1],
+    ['晚安', 'wǎn\'ān', 'Good night', 1],
+    ['我叫…', 'wǒ jiào…', 'My name is...', 1],
+    ['认识你很高兴', 'rènshi nǐ hěn gāoxìng', 'Nice to meet you', 3],
+    ['多少钱', 'duōshao qián', 'How much does it cost?', 2],
+    ['我不明白', 'wǒ bù míngbai', 'I don\'t understand', 2],
+    ['请再说一遍', 'qǐng zài shuō yí biàn', 'Please say that again', 3],
+    ['你会说英语吗', 'nǐ huì shuō Yīngyǔ ma', 'Do you speak English?', 3],
+    ['洗手间在哪儿', 'xǐshǒujiān zài nǎr', 'Where is the toilet?', 3],
+    ['我饿了', 'wǒ è le', 'I\'m hungry', 2],
+    ['没问题', 'méi wèntí', 'No problem', 2],
+    ['加油', 'jiāyóu', 'Keep going! / Good luck!', 1],
+    ['慢一点', 'màn yìdiǎn', 'A bit slower, please', 2]
+  ];
+
+  /* [question, [options — first is correct], explanation] */
+  var GRAMMAR = [
+    ['Which measure word goes with 书 (book)?', ['本', '只', '杯', '张'], '一本书 — 本 is the measure word for bound volumes.', 2],
+    ['Which measure word goes with 猫 (cat)?', ['只', '本', '条', '位'], '一只猫 — 只 is used for many small animals.', 2],
+    ['Which measure word goes with 茶 (a cup of tea)?', ['杯', '本', '张', '件'], '一杯茶 — 杯 means "cup".', 2],
+    ['Which measure word goes with 桌子 (table)?', ['张', '本', '只', '双'], '一张桌子 — 张 is used for flat things.', 2],
+    ['The default measure word, used when you are unsure, is:', ['个', '本', '只', '条'], '个 (gè) works with a very wide range of nouns.', 1],
+    ['How do you turn 你是学生 into a yes/no question?', ['你是学生吗？', '你是学生呢？', '吗你是学生？', '你吗是学生？'], '吗 goes at the very end of the sentence.', 1],
+    ['Which sentence correctly says "I don\'t have money"?', ['我没有钱', '我不有钱', '我不钱有', '我没钱不'], '有 is negated with 没, never with 不.', 2],
+    ['Where does the time word go in Chinese?', ['Before the verb: 我明天去', 'After the verb: 我去明天', 'At the very end always', 'It cannot appear in a sentence'], 'Chinese puts time expressions before the verb phrase.', 2],
+    ['What does 了 usually mark in 我吃了？', ['A completed action', 'A future action', 'A question', 'A negative'], '了 signals completion or a change of state.', 2],
+    ['Which is the correct word order for "I go to school by bus"?', ['我坐公共汽车去学校', '我去学校坐公共汽车', '我学校去坐公共汽车', '去我学校公共汽车坐'], 'The means of travel comes before the main verb 去.', 3],
+    ['What is the role of 的 in 我的书?', ['It marks possession', 'It marks the past', 'It asks a question', 'It negates the noun'], '我的书 = "my book".', 1],
+    ['Which sentence means "He is also a teacher"?', ['他也是老师', '他是也老师', '也他是老师', '他是老师也'], '也 goes directly before the verb.', 2],
+    ['With an adjective like 高兴, what usually comes before it?', ['很', '是', '的', '了'], '很高兴 — 很 links a subject to an adjective; 是 is not used there.', 2],
+    ['Which question word asks "where"?', ['哪儿', '什么', '谁', '怎么'], '哪儿 (nǎr) or 哪里 (nǎlǐ) means "where".', 1],
+    ['How do you say "I am not a student"?', ['我不是学生', '我没是学生', '我是不学生', '我不学生是'], '不 negates 是; 没 is used with 有 and completed actions.', 2],
+    ['In 我比他高, what does 比 do?', ['It makes a comparison', 'It asks a question', 'It marks the past', 'It shows possession'], '我比他高 = "I am taller than him".', 3],
+    ['Which is the correct way to say "two people"?', ['两个人', '二个人', '两人个', '个两人'], 'Before a measure word, "two" is 两, not 二.', 2],
+    ['What does 呢 do at the end of 你呢？', ['Bounces the same question back', 'Makes a command', 'Negates the sentence', 'Marks the future'], '你呢？= "And you?"', 2],
+    ['Which sentence means "I want to drink tea"?', ['我想喝茶', '我喝想茶', '我茶想喝', '想我喝茶'], 'Modal verb 想 comes before the main verb 喝.', 2],
+    ['What is the difference between 会 and 能?', ['会 = a learned skill, 能 = physically able or permitted', 'They are identical', '会 = past, 能 = future', '会 is a noun, 能 is a verb'], '我会游泳 (I can swim — I learned) vs 我今天不能游泳 (I can\'t swim today).', 3]
+  ];
+
+  /* ---------------- numbers ---------------- */
+  var DIGITS_HAN = ['零', '一', '二', '三', '四', '五', '六', '七', '八', '九'];
+  var DIGITS_PIN = ['líng', 'yī', 'èr', 'sān', 'sì', 'wǔ', 'liù', 'qī', 'bā', 'jiǔ'];
+  var UNITS_HAN = ['', '十', '百', '千'];
+  var UNITS_PIN = ['', 'shí', 'bǎi', 'qiān'];
+
+  function convert(n, digits, units, joiner) {
+    if (n === 0) return digits[0];
+    var str = String(n), len = str.length, out = [], gap = false;
+    for (var i = 0; i < len; i++) {
+      var d = +str.charAt(i), pos = len - 1 - i;
+      if (d === 0) { gap = true; continue; }
+      if (gap && out.length) out.push(digits[0]);
+      gap = false;
+      // 10-19 are 十一, 十二 … not 一十一
+      if (!(d === 1 && pos === 1 && out.length === 0)) out.push(digits[d]);
+      if (units[pos]) out.push(units[pos]);
+    }
+    return out.join(joiner);
+  }
+  function toHan(n) { return convert(n, DIGITS_HAN, UNITS_HAN, ''); }
+  function toPin(n) { return convert(n, DIGITS_PIN, UNITS_PIN, ' '); }
+
+  var NUMBER_RANGES = [
+    [[1, 10]],
+    [[1, 10], [11, 99]],
+    [[1, 10], [11, 99], [100, 999]],
+    [[11, 99], [100, 999], [1000, 9999]],
+    [[100, 999], [1000, 9999]]
+  ];
+
+  function numbers(n, stage) {
+    var ranges = NUMBER_RANGES[stage == null ? 2 : stage];
+    var modes = (stage != null && stage === 0) ? ['read', 'han'] : ['han', 'read', 'pin'];
+    var out = [], seen = {}, guard = 0;
+    while (out.length < n && guard++ < n * 30) {
+      var mode = U.pick(modes);
+      var r = U.pick(ranges);
+      var value = U.int(r[0], r[1]);
+      var key = mode + value;
+      if (seen[key]) continue;
+      seen[key] = true;
+
+      var han = toHan(value), pin = toPin(value);
+      // distractors drawn from the same range, near the answer where the range allows
+      var pool = [], used = {}, tries = 0;
+      var spread = Math.max(3, Math.round(value * 0.25));
+      while (pool.length < 6 && tries++ < 60) {
+        var alt = value + U.int(-spread, spread);
+        if (alt < r[0]) alt = U.int(r[0], r[1]);
+        if (alt > r[1]) alt = U.int(r[0], r[1]);
+        if (alt === value || used[alt]) continue;
+        used[alt] = true;
+        pool.push(alt);
+      }
+
+      if (mode === 'han') {
+        out.push(U.choice('Write ' + value + ' in Chinese characters.', han, pool.map(toHan), {
+          kicker: 'numbers', explanation: value + ' = ' + han + ' (' + pin + ')'
+        }));
+      } else if (mode === 'read') {
+        out.push(U.choice('What number is 「' + han + '」?', value, pool, {
+          kicker: 'numbers', promptBig: true, explanation: han + ' = ' + value + ' (' + pin + ')'
+        }));
+      } else {
+        out.push(U.choice('How do you say ' + value + ' in pinyin?', pin, pool.map(toPin), {
+          kicker: 'numbers', explanation: value + ' = ' + han + ' (' + pin + ')'
+        }));
+      }
+    }
+    return out;
+  }
+
+  /* ---------------- vocabulary generators ---------------- */
+  function fromBank(fullBank, mode, kicker) {
+    return function (n, stage) {
+      var bank = U.forStage(fullBank, stage);
+      return U.sample(bank, n).map(function (w) {
+        var hanzi = w[0], pinyin = w[1], english = w[2];
+        var m = mode === 'mixed' ? U.pick(['pinyin', 'meaning', 'toChinese']) : mode;
+
+        if (m === 'pinyin') {
+          var pool = bank.filter(function (x) { return x[0] !== hanzi; }).map(function (x) { return x[1]; });
+          return U.choice('How is 「' + hanzi + '」 pronounced?', pinyin, pool, {
+            kicker: kicker + ' · pinyin', promptBig: true,
+            explanation: hanzi + ' — ' + pinyin + ' — ' + english
+          });
+        }
+        if (m === 'meaning') {
+          var pool2 = bank.filter(function (x) { return x[0] !== hanzi; }).map(function (x) { return x[2]; });
+          return U.choice('What does 「' + hanzi + '」 mean?', english, pool2, {
+            kicker: kicker + ' · meaning', promptBig: true,
+            explanation: hanzi + ' (' + pinyin + ') means "' + english + '".'
+          });
+        }
+        var pool3 = bank.filter(function (x) { return x[0] !== hanzi; }).map(function (x) { return x[0]; });
+        return U.choice('Which characters mean "' + english + '"?', hanzi, pool3, {
+          kicker: kicker + ' · English → Chinese',
+          explanation: '"' + english + '" = ' + hanzi + ' (' + pinyin + ')'
+        });
+      });
+    };
+  }
+
+  function grammar(n, stage) {
+    return U.sample(U.forStage(GRAMMAR, stage), n).map(function (g) {
+      var correct = g[1][0];
+      var options = U.shuffle(g[1]);
+      return {
+        type: 'choice', kicker: 'grammar',
+        prompt: g[0], choices: options,
+        answer: options.indexOf(correct),
+        explanation: g[2]
+      };
+    });
+  }
+
+  function cards(fullBank) {
+    return function (stage) {
+      return U.forStage(fullBank, stage).map(function (w) {
+        return { front: w[0], back: w[2], sub: w[1] };
+      });
+    };
+  }
+
+  SH.register({
+    id: 'chinese',
+    name: 'Chinese',
+    native: '中文',
+    emoji: '🀄',
+    color: 'var(--chinese)',
+    blurb: 'Characters, pinyin, numbers, phrases and sentence patterns.',
+    topics: [
+      { id: 'pinyin', name: 'Characters → Pinyin', desc: 'Read the character, pick the pronunciation', generate: fromBank(VOCAB, 'pinyin', 'vocab'), flashcards: cards(VOCAB) },
+      { id: 'meaning', name: 'Characters → Meaning', desc: 'Read the character, pick the English', generate: fromBank(VOCAB, 'meaning', 'vocab'), flashcards: cards(VOCAB) },
+      { id: 'toChinese', name: 'English → Chinese', desc: 'Recall the characters from the English', generate: fromBank(VOCAB, 'toChinese', 'vocab'), flashcards: cards(VOCAB) },
+      { id: 'numbers', name: 'Numbers', desc: 'Read and write Chinese numbers', generate: numbers },
+      { id: 'phrases', name: 'Everyday Phrases', desc: 'Greetings, politeness and getting by', generate: fromBank(PHRASES, 'mixed', 'phrase'), flashcards: cards(PHRASES) },
+      { id: 'grammar', name: 'Grammar & Measure Words', desc: 'Word order, 的/了/吗, 不 vs 没, measure words', generate: grammar }
+    ]
+  });
+})(window.StudyHub);
+</script>
+<script>
+/* The lesson runner: one screen at a time, hearts, check-then-continue. */
+(function (SH) {
+  'use strict';
+
+  var LETTERS = ['1', '2', '3', '4', '5', '6'];
+
+  function el(tag, cls, text) {
+    var n = document.createElement(tag);
+    if (cls) n.className = cls;
+    if (text != null) n.textContent = text;
+    return n;
+  }
+  function normalise(s) {
+    return String(s).trim().toLowerCase().replace(/\s+/g, ' ').replace(/[.,!?;:]+$/, '');
+  }
+  function isCjk(s) { return /[㐀-鿿]/.test(s); }
+
+  /* opts: { subject, topic, lesson, stage, mode: 'lesson' | 'practice', onExit } */
+  function Lesson(root, opts) {
+    this.root = root;
+    this.subject = opts.subject;
+    this.topic = opts.topic;
+    this.lessonIndex = opts.lesson;
+    this.stage = opts.stage;
+    this.mode = opts.mode || 'lesson';
+    this.onExit = opts.onExit;
+
+    this.count = SH.Progress.QUESTIONS_PER_LESSON;
+    this.questions = this.topic.generate(this.count, this.stage);
+    this.index = 0;
+    this.correct = 0;
+    this.log = [];
+    this.picked = null;
+    this.typed = '';
+    this.checked = false;
+    this.finished = false;
+
+    this.onKey = this.handleKey.bind(this);
+    document.addEventListener('keydown', this.onKey);
+  }
+
+  Lesson.prototype.detach = function () { document.removeEventListener('keydown', this.onKey); };
+
+  Lesson.prototype.handleKey = function (e) {
+    if (this.finished || !document.body.contains(this.root)) return;
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      if (this.checked) this.advance();
+      else if (this.picked != null || this.typed) this.check();
+      return;
+    }
+    var q = this.questions[this.index];
+    if (!q || q.type !== 'choice' || this.checked) return;
+    var i = LETTERS.indexOf(e.key);
+    if (i >= 0 && i < q.choices.length) {
+      e.preventDefault();
+      this.picked = i;
+      this.draw();
+    }
+  };
+
+  Lesson.prototype.check = function () {
+    if (this.checked) return;
+    var q = this.questions[this.index];
+    var right;
+    if (q.type === 'input') {
+      var accepted = (q.accept || [q.answer]).map(normalise);
+      right = accepted.indexOf(normalise(this.typed)) !== -1;
+      this.log.push({ prompt: q.prompt, given: this.typed || '(blank)', answer: q.answer, ok: right });
+    } else {
+      if (this.picked == null) return;
+      right = this.picked === q.answer;
+      this.log.push({ prompt: q.prompt, given: q.choices[this.picked], answer: q.choices[q.answer], ok: right });
+    }
+    this.checked = true;
+    this.lastOk = right;
+    if (right) this.correct++;
+    else if (this.mode === 'lesson') this.hearts = SH.Progress.loseHeart();
+    this.draw();
+  };
+
+  Lesson.prototype.advance = function () {
+    if (this.mode === 'lesson' && SH.Progress.hearts() <= 0) return this.outOfHearts();
+    this.index++;
+    this.picked = null;
+    this.typed = '';
+    this.checked = false;
+    if (this.index >= this.questions.length) return this.finish();
+    this.draw();
+  };
+
+  Lesson.prototype.finish = function () {
+    this.finished = true;
+    this.detach();
+    var pct = Math.round((this.correct / this.questions.length) * 100);
+    var passed = this.correct >= Math.ceil(this.questions.length * 0.6);
+    var xp = this.mode === 'practice' ? 5 : SH.Progress.XP_PER_LESSON + (pct === 100 ? 5 : 0);
+
+    SH.Progress.finishLesson({
+      subject: this.subject.id, topic: this.topic.id, lesson: this.lessonIndex,
+      correct: this.correct, asked: this.questions.length, passed: passed, xp: xp
+    });
+    if (this.mode === 'practice') SH.Progress.gainHeart();
+
+    this.renderResult(pct, passed, this.mode === 'practice' ? 5 : (passed ? xp : 0));
+  };
+
+  Lesson.prototype.outOfHearts = function () {
+    this.finished = true;
+    this.detach();
+    var self = this;
+    SH.Progress.finishLesson({
+      subject: this.subject.id, topic: this.topic.id, lesson: this.lessonIndex,
+      correct: this.correct, asked: this.index + 1, passed: false, xp: 0
+    });
+
+    this.root.innerHTML = '';
+    var box = el('div', 'result');
+    box.appendChild(el('div', 'mascot', '💔'));
+    box.appendChild(el('h1', null, 'You ran out of hearts'));
+    box.appendChild(el('p', 'subline', 'Hearts come back over time — one every 20 minutes. Practice a finished lesson to earn one back straight away.'));
+    var again = el('button', 'btn btn--wide', 'Back to the path');
+    again.type = 'button';
+    again.onclick = function () { self.onExit(); };
+    var refill = el('button', 'btn btn--ghost btn--wide', 'Refill hearts now');
+    refill.type = 'button';
+    refill.style.marginTop = '10px';
+    refill.onclick = function () { SH.Progress.refillHearts(); self.onExit(); };
+    box.appendChild(again);
+    box.appendChild(refill);
+    this.root.appendChild(box);
+  };
+
+  Lesson.prototype.renderResult = function (pct, passed, xp) {
+    var self = this;
+    this.root.innerHTML = '';
+    var box = el('div', 'result');
+    box.appendChild(el('div', 'mascot', pct === 100 ? '🏆' : passed ? '🎉' : '💪'));
+    box.appendChild(el('h1', null, pct === 100 ? 'Flawless!' : passed ? 'Lesson complete!' : 'Keep going!'));
+    box.appendChild(el('p', 'subline',
+      this.subject.name + ' · ' + this.topic.name + (passed ? '' : ' — get 60% to unlock the next lesson')));
+
+    var tally = el('div', 'tally');
+    [['green', 'Total XP', '+' + xp], ['blue', 'Accuracy', pct + '%'], ['', 'Correct', this.correct + '/' + this.questions.length]]
+      .forEach(function (t) {
+        var b = el('div', 'tally-box' + (t[0] ? ' ' + t[0] : ''));
+        b.appendChild(el('div', 'tally-label', t[1]));
+        b.appendChild(el('div', 'tally-value', t[2]));
+        tally.appendChild(b);
+      });
+    box.appendChild(tally);
+
+    var misses = this.log.filter(function (l) { return !l.ok; });
+    if (misses.length) {
+      var review = el('div', 'review');
+      review.appendChild(el('div', 'kicker', 'Worth another look'));
+      misses.forEach(function (m) {
+        var row = el('div', 'review-item miss');
+        row.appendChild(el('div', null, m.prompt));
+        row.appendChild(el('div', 'r-a', 'You said "' + m.given + '" · answer: ' + m.answer));
+        review.appendChild(row);
+      });
+      box.appendChild(review);
+    }
+
+    var cont = el('button', 'btn btn--wide', 'Continue');
+    cont.type = 'button';
+    cont.onclick = function () { self.onExit(); };
+    box.appendChild(cont);
+
+    var again = el('button', 'btn btn--ghost btn--wide', 'Practise again');
+    again.type = 'button';
+    again.style.marginTop = '10px';
+    again.onclick = function () {
+      SH.startLesson(self.root, {
+        subject: self.subject, topic: self.topic, lesson: self.lessonIndex,
+        stage: self.stage, mode: self.mode, onExit: self.onExit
+      });
+    };
+    box.appendChild(again);
+
+    this.root.appendChild(box);
+    window.scrollTo(0, 0);
+  };
+
+  Lesson.prototype.draw = function () {
+    var self = this;
+    var q = this.questions[this.index];
+    this.root.innerHTML = '';
+
+    /* --- top bar: quit, progress, hearts --- */
+    var top = el('div', 'lesson-top');
+    var quit = el('button', 'close-x', '✕');
+    quit.type = 'button';
+    quit.title = 'Quit lesson';
+    quit.onclick = function () { self.detach(); self.onExit(); };
+    top.appendChild(quit);
+
+    var track = el('div', 'track');
+    track.style.flex = '1';
+    var fill = el('i');
+    fill.style.width = Math.round((this.index / this.questions.length) * 100) + '%';
+    track.appendChild(fill);
+    top.appendChild(track);
+
+    if (this.mode === 'lesson') {
+      top.appendChild(el('span', 'stat-pill heart', '❤️ ' + SH.Progress.hearts()));
+    } else {
+      top.appendChild(el('span', 'stat-pill dim', '∞'));
+    }
+    this.root.appendChild(top);
+
+    /* --- question --- */
+    var body = el('div', 'lesson-body');
+    body.appendChild(el('div', 'kicker', q.kicker || this.topic.name));
+    if (q.passage) body.appendChild(el('div', 'passage', q.passage));
+
+    var promptCls = 'prompt' + (q.promptBig ? ' big' : '') + (isCjk(q.prompt) && q.promptBig ? ' script' : '');
+    body.appendChild(el('h2', promptCls, q.prompt));
+
+    if (q.type === 'input') {
+      var input = el('input', 'type-answer');
+      input.type = 'text';
+      input.autocomplete = 'off';
+      input.placeholder = 'Type your answer';
+      input.value = this.typed;
+      input.disabled = this.checked;
+      input.oninput = function () { self.typed = input.value; self.syncCheckButton(); };
+      body.appendChild(input);
+      if (!this.checked) setTimeout(function () { input.focus(); }, 0);
+    } else {
+      var options = el('div', 'options');
+      q.choices.forEach(function (text, i) {
+        var b = el('button', 'option');
+        b.type = 'button';
+        if (self.checked) {
+          b.disabled = true;
+          if (i === q.answer) b.className = 'option right';
+          else if (i === self.picked) b.className = 'option wrong';
+        } else if (self.picked === i) {
+          b.className = 'option sel';
+        }
+        b.appendChild(el('span', 'key', LETTERS[i]));
+        b.appendChild(el('span', null, text));
+        b.onclick = function () { self.picked = i; self.draw(); };
+        options.appendChild(b);
+      });
+      body.appendChild(options);
+    }
+    this.root.appendChild(body);
+
+    /* --- bottom bar --- */
+    var bar = el('div', 'footbar' + (this.checked ? (this.lastOk ? ' ok' : ' no') : ''));
+    var inner = el('div', 'footbar-inner');
+
+    if (this.checked) {
+      var verdict = el('div', 'verdict');
+      var head = el('div', 'headline');
+      head.appendChild(el('span', null, this.lastOk ? '✓' : '✕'));
+      head.appendChild(el('span', null, this.lastOk ? 'Nicely done!' : 'Correct answer: ' +
+        (q.type === 'input' ? q.answer : q.choices[q.answer])));
+      verdict.appendChild(head);
+      if (q.explanation) verdict.appendChild(el('div', 'why', q.explanation));
+      inner.appendChild(verdict);
+
+      var cont = el('button', 'btn' + (this.lastOk ? '' : ' btn--red'),
+        this.index + 1 >= this.questions.length ? 'Finish' : 'Continue');
+      cont.type = 'button';
+      cont.onclick = function () { self.advance(); };
+      inner.appendChild(cont);
+      setTimeout(function () { cont.focus(); }, 0);
+    } else {
+      inner.appendChild(el('div', 'verdict small muted',
+        q.type === 'input' ? 'Type your answer, then press Enter' : 'Pick an answer — or press 1–' + q.choices.length));
+      var checkBtn = el('button', 'btn', 'Check');
+      checkBtn.type = 'button';
+      checkBtn.disabled = q.type === 'input' ? !this.typed : this.picked == null;
+      checkBtn.onclick = function () { self.check(); };
+      this.checkBtn = checkBtn;
+      inner.appendChild(checkBtn);
+    }
+
+    bar.appendChild(inner);
+    this.root.appendChild(bar);
+  };
+
+  Lesson.prototype.syncCheckButton = function () {
+    if (this.checkBtn) this.checkBtn.disabled = !this.typed;
+  };
+
+  SH.startLesson = function (root, opts) {
+    var l = new Lesson(root, opts);
+    l.draw();
+    window.scrollTo(0, 0);
+    return l;
+  };
+
+  /* ---------------- flashcards ---------------- */
+  SH.renderFlashcards = function (root, subject, topic, stage, onExit) {
+    var cards = SH.U.shuffle(topic.flashcards(stage));
+    var i = 0, flipped = false;
+
+    function draw() {
+      root.innerHTML = '';
+      var top = el('div', 'lesson-top');
+      var quit = el('button', 'close-x', '✕');
+      quit.type = 'button';
+      quit.onclick = function () { document.removeEventListener('keydown', keys); onExit(); };
+      top.appendChild(quit);
+      var track = el('div', 'track');
+      track.style.flex = '1';
+      var fill = el('i');
+      fill.style.width = Math.round(((i + 1) / cards.length) * 100) + '%';
+      track.appendChild(fill);
+      top.appendChild(track);
+      top.appendChild(el('span', 'stat-pill dim', (i + 1) + '/' + cards.length));
+      root.appendChild(top);
+
+      var c = cards[i];
+      var body = el('div', 'lesson-body center');
+      body.appendChild(el('div', 'kicker', subject.name + ' · ' + topic.name));
+      var face = el('h2', 'prompt big' + (isCjk(c.front) ? ' script' : ''), c.front);
+      face.style.cursor = 'pointer';
+      face.onclick = function () { flipped = !flipped; draw(); };
+      body.appendChild(face);
+      if (flipped) {
+        body.appendChild(el('div', 'prompt', c.back));
+        if (c.sub) body.appendChild(el('div', 'muted', c.sub));
+      } else {
+        body.appendChild(el('div', 'muted', 'Tap the card or press Space to reveal'));
+      }
+      root.appendChild(body);
+
+      var bar = el('div', 'footbar');
+      var inner = el('div', 'footbar-inner');
+      var prev = el('button', 'btn btn--ghost', 'Back');
+      prev.type = 'button';
+      prev.onclick = function () { i = (i - 1 + cards.length) % cards.length; flipped = false; draw(); };
+      var flip = el('button', 'btn btn--blue', flipped ? 'Hide' : 'Reveal');
+      flip.type = 'button';
+      flip.onclick = function () { flipped = !flipped; draw(); };
+      var next = el('button', 'btn', 'Next');
+      next.type = 'button';
+      next.onclick = function () { i = (i + 1) % cards.length; flipped = false; draw(); };
+      inner.appendChild(prev);
+      inner.appendChild(flip);
+      inner.appendChild(next);
+      bar.appendChild(inner);
+      root.appendChild(bar);
+    }
+
+    function keys(e) {
+      if (!document.body.contains(root)) { document.removeEventListener('keydown', keys); return; }
+      if (e.key === 'ArrowRight') { i = (i + 1) % cards.length; flipped = false; draw(); }
+      else if (e.key === 'ArrowLeft') { i = (i - 1 + cards.length) % cards.length; flipped = false; draw(); }
+      else if (e.key === ' ' || e.key === 'Enter') { e.preventDefault(); flipped = !flipped; draw(); }
+    }
+    document.addEventListener('keydown', keys);
+    draw();
+    window.scrollTo(0, 0);
+  };
+})(window.StudyHub);
+</script>
+<script>
+/* Shell: onboarding, the HUD, the lesson path and the stats pages. */
+(function (SH) {
+  'use strict';
+
+  var hudEl, appEl;
+  var state = { view: 'path', subjectId: 'english', onboardStep: 0, draftAge: null };
+
+  function el(tag, cls, text) {
+    var n = document.createElement(tag);
+    if (cls) n.className = cls;
+    if (text != null) n.textContent = text;
+    return n;
+  }
+  function btn(cls, text, onClick) {
+    var b = el('button', cls, text);
+    b.type = 'button';
+    b.onclick = onClick;
+    return b;
+  }
+  function profile() { return SH.Profile.get(); }
+  function stage() { var p = profile(); return p ? p.stageIndex : 2; }
+
+  var COURSE_KEY = 'studyhub.course';
+
+  function go(view, subjectId) {
+    state.view = view;
+    if (subjectId) {
+      state.subjectId = subjectId;
+      try { localStorage.setItem(COURSE_KEY, subjectId); } catch (e) {}
+    }
+    render();
+  }
+  SH.go = go;
+
+  /* ---------------------------- HUD ---------------------------- */
+  function renderHud() {
+    hudEl.innerHTML = '';
+    if (state.view === 'onboard' || state.view === 'lesson') return;
+
+    var bar = el('div', 'hud');
+    bar.appendChild(btn('brand', '📚 StudyHub', function () { go('path'); }));
+    bar.appendChild(el('div', 'hud-spacer'));
+
+    var data = SH.Progress.all();
+    bar.appendChild(el('span', 'stat-pill fire', '🔥 ' + data.streak.current));
+    bar.appendChild(el('span', 'stat-pill gem', '💎 ' + data.xp));
+    bar.appendChild(el('span', 'stat-pill heart', '❤️ ' + data.hearts.n));
+    bar.appendChild(btn('icon-btn', '📊', function () { go('stats'); }));
+    bar.appendChild(btn('icon-btn', '👤', function () { go('profile'); }));
+    bar.appendChild(btn('icon-btn', document.documentElement.getAttribute('data-theme') === 'dark' ? '☀️' : '🌙',
+      function () { SH.Theme.toggle(); render(); }));
+    hudEl.appendChild(bar);
+
+    if (state.view !== 'path') return;
+    var chips = el('div', 'courses');
+    SH.subjects.forEach(function (s) {
+      var c = el('button', 'course-chip' + (s.id === state.subjectId ? ' on' : ''));
+      c.type = 'button';
+      c.style.color = s.id === state.subjectId ? s.color : '';
+      c.appendChild(el('span', 'emoji', s.emoji));
+      c.appendChild(el('span', null, s.name + (s.native ? ' ' + s.native : '')));
+      c.onclick = function () { go('path', s.id); };
+      chips.appendChild(c);
+    });
+    hudEl.appendChild(chips);
+  }
+
+  /* ------------------------- onboarding ------------------------- */
+  function renderOnboard() {
+    appEl.innerHTML = '';
+    var box = el('div', 'onboard');
+
+    var dots = el('div', 'step-dots');
+    for (var i = 0; i < 3; i++) dots.appendChild(el('i', i <= state.onboardStep ? 'on' : ''));
+
+    if (state.onboardStep === 0) {
+      box.appendChild(el('div', 'mascot', '📚'));
+      box.appendChild(el('h1', null, 'Welcome to StudyHub'));
+      box.appendChild(el('p', null, 'Bite-sized lessons in English, Math, Science and Chinese — matched to your school year.'));
+      box.appendChild(dots);
+      box.appendChild(btn('btn btn--wide', 'Get started', function () { state.onboardStep = 1; render(); }));
+      box.style.maxWidth = '420px';
+      box.style.margin = '0 auto';
+      appEl.appendChild(box);
+      return;
+    }
+
+    if (state.onboardStep === 1) {
+      box.appendChild(el('div', 'mascot', '🎂'));
+      box.appendChild(el('h1', null, 'How old are you?'));
+      box.appendChild(el('div', 'speech', 'Your age sets the syllabus — the questions, the vocabulary and the difficulty all follow it.'));
+
+      var grid = el('div', 'age-grid');
+      SH.Profile.stages.forEach(function (st, idx) {
+        var t = el('button', 'tile' + (state.draftAge != null && SH.Profile.stageForAge(state.draftAge) === idx ? ' sel' : ''));
+        t.type = 'button';
+        var body = el('div');
+        body.appendChild(el('div', null, st.label));
+        body.appendChild(el('span', 'tile-sub', st.name));
+        t.appendChild(el('span', 'emoji', ['🧸', '🎒', '📐', '🔬', '🎓'][idx]));
+        t.appendChild(body);
+        t.onclick = function () {
+          state.draftAge = Math.min(st.max, Math.max(st.min, st.min + 1));
+          render();
+        };
+        grid.appendChild(t);
+      });
+      box.appendChild(grid);
+
+      var form = el('form', 'age-input');
+      var input = el('input');
+      input.type = 'number';
+      input.min = '3';
+      input.max = '120';
+      input.placeholder = 'Exact age';
+      if (state.draftAge != null) input.value = state.draftAge;
+      form.appendChild(input);
+      form.onsubmit = function (e) { e.preventDefault(); saveAge(); };
+      box.appendChild(form);
+
+      /* live syllabus preview, updated in place so the field keeps focus */
+      var preview = el('p', 'muted small');
+      preview.id = 'syllabusPreview';
+      box.appendChild(preview);
+
+      function syncAge() {
+        var ok = state.draftAge >= 3 && state.draftAge <= 120;
+        var next = document.getElementById('ageNext');
+        if (next) next.disabled = !ok;
+        preview.textContent = ok
+          ? 'Syllabus: ' + SH.Profile.stages[SH.Profile.stageForAge(state.draftAge)].name +
+            ' · ' + SH.Profile.stages[SH.Profile.stageForAge(state.draftAge)].grades
+          : 'Pick a band above or type your exact age.';
+      }
+      input.oninput = function () {
+        var v = parseInt(input.value, 10);
+        state.draftAge = isFinite(v) ? v : null;
+        syncAge();
+      };
+      setTimeout(syncAge, 0);
+
+      box.appendChild(dots);
+      var next = btn('btn btn--wide', 'Continue', saveAge);
+      next.id = 'ageNext';
+      next.disabled = !(state.draftAge >= 3 && state.draftAge <= 120);
+      box.appendChild(next);
+      box.style.maxWidth = '460px';
+      box.style.margin = '0 auto';
+      appEl.appendChild(box);
+      return;
+    }
+
+    // step 2: choose the first course
+    var p = profile();
+    box.appendChild(el('div', 'mascot', '🚀'));
+    box.appendChild(el('h1', null, 'Where would you like to start?'));
+    box.appendChild(el('p', null, 'You are on the ' + p.stage.name + ' syllabus (' + p.stage.grades + '). You can switch subjects any time.'));
+    var list = el('div', 'age-grid');
+    list.style.gridTemplateColumns = '1fr';
+    SH.subjects.forEach(function (s) {
+      var t = el('button', 'tile');
+      t.type = 'button';
+      t.appendChild(el('span', 'emoji', s.emoji));
+      var body = el('div');
+      body.appendChild(el('div', null, s.name + (s.native ? '  ' + s.native : '')));
+      body.appendChild(el('span', 'tile-sub', s.blurb));
+      t.appendChild(body);
+      t.onclick = function () { go('path', s.id); };
+      list.appendChild(t);
+    });
+    box.appendChild(list);
+    box.appendChild(dots);
+    box.style.maxWidth = '460px';
+    box.style.margin = '0 auto';
+    appEl.appendChild(box);
+  }
+
+  function saveAge() {
+    if (!(state.draftAge >= 3 && state.draftAge <= 120)) return;
+    SH.Profile.set(state.draftAge);
+    state.onboardStep = 2;
+    render();
+  }
+
+  /* --------------------------- the path --------------------------- */
+  function renderPath() {
+    appEl.innerHTML = '';
+    var subject = SH.subject(state.subjectId) || SH.subjects[0];
+    var p = profile();
+    var st = stage();
+    var wrap = el('div', 'wrap');
+
+    /* daily goal */
+    var data = SH.Progress.all();
+    var doneToday = SH.Progress.xpToday();
+    var goal = data.goal;
+    var card = el('div', 'goal-card');
+    card.appendChild(el('div', 'goal-ring', doneToday >= goal ? '✅' : '🎯'));
+    var gb = el('div', 'goal-body');
+    gb.appendChild(el('div', 'goal-title', doneToday >= goal ? 'Daily goal complete!' : 'Daily goal'));
+    gb.appendChild(el('div', 'muted small', doneToday + ' / ' + goal + ' questions answered today · 🔥 ' + data.streak.current + ' day streak'));
+    var track = el('div', 'track');
+    var fill = el('i');
+    fill.style.width = Math.min(100, Math.round((doneToday / goal) * 100)) + '%';
+    track.appendChild(fill);
+    gb.appendChild(track);
+    card.appendChild(gb);
+    wrap.appendChild(card);
+
+    var head = el('div', 'section-head');
+    var h = el('div');
+    h.appendChild(el('h2', null, subject.name + (subject.native ? ' ' + subject.native : '')));
+    h.appendChild(el('div', 'muted small', p.stage.name + ' syllabus · ' + p.stage.grades));
+    head.appendChild(h);
+    wrap.appendChild(head);
+
+    subject.topics.forEach(function (topic, unitIndex) {
+      var crowns = SH.Progress.crowns(subject.id, topic.id);
+      var prevComplete = unitIndex === 0 || SH.Progress.unitComplete(subject.id, subject.topics[unitIndex - 1].id);
+
+      var unit = el('div', 'unit');
+      unit.style.setProperty('--sub', subject.color);
+      var left = el('div');
+      left.appendChild(el('div', 'unit-title', 'Unit ' + (unitIndex + 1) + ' · ' + topic.name));
+      left.appendChild(el('div', 'unit-sub', (topic.stageDesc && topic.stageDesc[st]) || topic.desc));
+      unit.appendChild(left);
+      unit.appendChild(el('div', 'unit-crowns', '👑 ' + crowns + '/' + SH.Progress.LESSONS_PER_UNIT));
+      wrap.appendChild(unit);
+
+      var path = el('div', 'path');
+      for (var i = 0; i < SH.Progress.LESSONS_PER_UNIT; i++) {
+        (function (lessonIndex) {
+          var done = !!SH.Progress.lesson(subject.id, topic.id, lessonIndex);
+          var prevLessonDone = lessonIndex === 0 || !!SH.Progress.lesson(subject.id, topic.id, lessonIndex - 1);
+          var open = prevComplete && prevLessonDone;
+          var isCurrent = open && !done;
+
+          var row = el('div', 'path-row');
+          // stepping stones: the path snakes left and right down the page
+          row.style.transform = 'translateX(' + [0, 62, 90, 62, 0][lessonIndex] * (unitIndex % 2 ? -1 : 1) + 'px)';
+
+          var node = el('button', 'node' + (done ? ' done' : open ? '' : ' locked') + (isCurrent ? ' current' : ''));
+          node.type = 'button';
+          node.style.setProperty('--sub', subject.color);
+          node.textContent = done ? '👑' : open ? '★' : '🔒';
+          node.title = 'Lesson ' + (lessonIndex + 1);
+          if (isCurrent) {
+            node.appendChild(el('span', 'node-flag', lessonIndex === 0 && crowns === 0 ? 'Start' : 'Continue'));
+            row.style.marginTop = '24px';   // room for the flag above the node
+          }
+          node.onclick = function () {
+            if (!open) return lockedModal(subject, topic, lessonIndex);
+            startLesson(subject, topic, lessonIndex, done ? 'practice' : 'lesson');
+          };
+          row.appendChild(node);
+          path.appendChild(row);
+        })(i);
+      }
+      wrap.appendChild(path);
+
+      var actions = el('div', 'section-head');
+      actions.style.margin = '4px 0 0';
+      var practice = btn('btn btn--ghost', '🔁 Practice', function () {
+        startLesson(subject, topic, 0, 'practice');
+      });
+      actions.appendChild(practice);
+      if (topic.flashcards) {
+        actions.appendChild(btn('btn btn--ghost', '🗂 Cards', function () {
+          state.view = 'lesson';
+          renderHud();
+          appEl.innerHTML = '';
+          SH.renderFlashcards(appEl, subject, topic, st, function () { go('path'); });
+        }));
+      }
+      wrap.appendChild(actions);
+    });
+
+    appEl.appendChild(wrap);
+  }
+
+  function startLesson(subject, topic, lessonIndex, mode) {
+    if (mode === 'lesson' && SH.Progress.hearts() <= 0) return noHeartsModal();
+    state.view = 'lesson';
+    renderHud();
+    appEl.innerHTML = '';
+    SH.startLesson(appEl, {
+      subject: subject, topic: topic, lesson: lessonIndex, stage: stage(), mode: mode,
+      onExit: function () { go('path'); }
+    });
+  }
+
+  function modal(title, text, buttons) {
+    var back = el('div', 'modal-backdrop');
+    var box = el('div', 'modal');
+    box.appendChild(el('h2', null, title));
+    box.appendChild(el('p', null, text));
+    buttons.forEach(function (b) {
+      box.appendChild(btn(b.cls || 'btn btn--wide', b.label, function () {
+        document.body.removeChild(back);
+        if (b.action) b.action();
+      }));
+    });
+    back.appendChild(box);
+    back.onclick = function (e) { if (e.target === back) document.body.removeChild(back); };
+    document.body.appendChild(back);
+  }
+
+  function lockedModal(subject, topic, lessonIndex) {
+    modal('Locked for now', 'Finish the lessons before it to unlock this one — or jump straight in if you already know the material.', [
+      { label: 'Jump ahead', action: function () { startLesson(subject, topic, lessonIndex, 'lesson'); } },
+      { label: 'Not yet', cls: 'btn btn--ghost btn--wide' }
+    ]);
+  }
+
+  function noHeartsModal() {
+    var mins = Math.ceil(SH.Progress.msToNextHeart() / 60000);
+    modal('Out of hearts', 'The next heart arrives in about ' + mins + ' minute' + (mins === 1 ? '' : 's') +
+      '. Practising a finished lesson earns one back straight away.', [
+      { label: 'Refill now', action: function () { SH.Progress.refillHearts(); render(); } },
+      { label: 'Wait', cls: 'btn btn--ghost btn--wide' }
+    ]);
+  }
+
+  /* ---------------------------- stats ---------------------------- */
+  function renderStats() {
+    appEl.innerHTML = '';
+    var data = SH.Progress.all();
+    var wrap = el('div', 'wrap wrap--wide');
+    wrap.appendChild(el('h1', null, 'Your progress'));
+    wrap.appendChild(el('p', 'muted', 'Everything is stored on this device only.'));
+
+    var acc = data.totals.asked ? Math.round((data.totals.correct / data.totals.asked) * 100) : 0;
+    var crowns = Object.keys(data.lessons).length;
+    var grid = el('div', 'stat-grid');
+    [['💎', data.xp, 'Total XP'], ['🔥', data.streak.current, 'Day streak'],
+     ['👑', crowns, 'Lessons cleared'], ['🎯', acc + '%', 'Accuracy'],
+     ['❓', data.totals.asked, 'Questions answered'], ['🏅', data.streak.best, 'Best streak']]
+      .forEach(function (s) {
+        var c = el('div', 'stat-card');
+        c.appendChild(el('div', 'big', s[0]));
+        var b = el('div');
+        b.appendChild(el('div', 'big', String(s[1])));
+        b.appendChild(el('div', 'cap', s[2]));
+        c.appendChild(b);
+        grid.appendChild(c);
+      });
+    wrap.appendChild(grid);
+
+    SH.subjects.forEach(function (s) {
+      var sub = SH.Progress.subject(s.id);
+      wrap.appendChild(el('h2', 'section-head', ''));
+      var head = wrap.lastChild;
+      head.appendChild(el('h2', null, s.emoji + '  ' + s.name));
+      head.appendChild(el('span', 'muted small',
+        sub.asked ? Math.round((sub.correct / sub.asked) * 100) + '% over ' + sub.asked + ' questions' : 'not started'));
+
+      var rows = el('div', 'rows');
+      s.topics.forEach(function (t) {
+        var stats = SH.Progress.topic(s.id, t.id);
+        var crownCount = SH.Progress.crowns(s.id, t.id);
+        var row = el('div', 'row');
+        var main = el('div', 'row-main');
+        main.appendChild(el('div', 'row-title', t.name));
+        var track = el('div', 'track blue');
+        var fill = el('i');
+        fill.style.width = Math.round((crownCount / SH.Progress.LESSONS_PER_UNIT) * 100) + '%';
+        track.appendChild(fill);
+        main.appendChild(track);
+        row.appendChild(main);
+        row.appendChild(el('div', 'row-num',
+          stats.asked ? Math.round((stats.correct / stats.asked) * 100) + '%' : '—'));
+        row.appendChild(el('div', 'row-num', '👑 ' + crownCount));
+        rows.appendChild(row);
+      });
+      wrap.appendChild(rows);
+    });
+
+    appEl.appendChild(wrap);
+  }
+
+  /* --------------------------- profile --------------------------- */
+  function renderProfile() {
+    appEl.innerHTML = '';
+    var p = profile();
+    var wrap = el('div', 'wrap');
+    wrap.appendChild(el('h1', null, 'Your syllabus'));
+
+    var card = el('div', 'goal-card');
+    card.appendChild(el('div', 'goal-ring', '🎓'));
+    var body = el('div', 'goal-body');
+    body.appendChild(el('div', 'goal-title', 'Age ' + p.age + ' · ' + p.stage.name));
+    body.appendChild(el('div', 'muted small', p.stage.grades));
+    card.appendChild(body);
+    wrap.appendChild(card);
+
+    wrap.appendChild(el('h2', 'section-head', ''));
+    wrap.lastChild.appendChild(el('h2', null, 'What you are studying'));
+    var rows = el('div', 'rows');
+    SH.subjects.forEach(function (s) {
+      s.topics.forEach(function (t) {
+        var row = el('div', 'row');
+        var main = el('div', 'row-main');
+        main.appendChild(el('div', 'row-title', s.emoji + '  ' + t.name));
+        main.appendChild(el('div', 'row-sub', (t.stageDesc && t.stageDesc[p.stageIndex]) || t.desc));
+        row.appendChild(main);
+        rows.appendChild(row);
+      });
+    });
+    wrap.appendChild(rows);
+
+    wrap.appendChild(el('h2', 'section-head', ''));
+    wrap.lastChild.appendChild(el('h2', null, 'Settings'));
+
+    var goalRow = el('div', 'row');
+    var goalMain = el('div', 'row-main');
+    goalMain.appendChild(el('div', 'row-title', 'Daily goal'));
+    goalMain.appendChild(el('div', 'row-sub', 'Questions to answer each day'));
+    goalRow.appendChild(goalMain);
+    [10, 30, 50].forEach(function (g) {
+      var b = btn('btn btn--ghost' + (SH.Progress.all().goal === g ? ' sel' : ''), String(g), function () {
+        SH.Progress.setGoal(g);
+        render();
+      });
+      b.style.minHeight = '38px';
+      b.style.padding = '6px 12px';
+      if (SH.Progress.all().goal === g) { b.style.borderColor = 'var(--green)'; b.style.color = 'var(--green)'; }
+      goalRow.appendChild(b);
+    });
+    wrap.appendChild(goalRow);
+
+    var actions = el('div', 'rows');
+    actions.appendChild(btn('btn btn--ghost btn--wide', 'Change my age', function () {
+      state.draftAge = p.age;
+      state.onboardStep = 1;
+      go('onboard');
+    }));
+    actions.appendChild(btn('btn btn--ghost btn--wide', 'Refill hearts', function () {
+      SH.Progress.refillHearts();
+      render();
+    }));
+    actions.appendChild(btn('btn btn--red btn--wide', 'Reset all progress', function () {
+      modal('Reset everything?', 'This clears your XP, streak, crowns and age. It cannot be undone.', [
+        { label: 'Yes, reset', cls: 'btn btn--red btn--wide', action: function () {
+          SH.Progress.reset();
+          SH.Profile.clear();
+          state.onboardStep = 0;
+          state.draftAge = null;
+          go('onboard');
+        } },
+        { label: 'Cancel', cls: 'btn btn--ghost btn--wide' }
+      ]);
+    }));
+    wrap.appendChild(actions);
+
+    appEl.appendChild(wrap);
+  }
+
+  /* ---------------------------- render ---------------------------- */
+  function render() {
+    if (!profile() && state.view !== 'onboard') state.view = 'onboard';
+    renderHud();
+    if (state.view === 'onboard') return renderOnboard();
+    if (state.view === 'stats') return renderStats();
+    if (state.view === 'profile') return renderProfile();
+    if (state.view === 'lesson') return;   // the lesson runner owns the screen
+    renderPath();
+  }
+
+  document.addEventListener('DOMContentLoaded', function () {
+    hudEl = document.getElementById('hud');
+    appEl = document.getElementById('app');
+    SH.Theme.init();
+    try {
+      var saved = localStorage.getItem(COURSE_KEY);
+      if (saved && SH.subject(saved)) state.subjectId = saved;
+    } catch (e) {}
+    if (!profile()) { state.view = 'onboard'; state.onboardStep = 0; }
+    render();
+  });
+})(window.StudyHub);
+</script>
+</body>
+</html>

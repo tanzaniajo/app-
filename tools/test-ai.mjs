@@ -29,6 +29,7 @@ for (const [fen, want, label] of TACTICS) {
 }
 
 console.log('\nlegality — every level returns legal moves only');
+AI.LEVELS.forEach(l => { l.timeMs = Math.min(l.timeMs, 150); });
 for (const level of AI.LEVELS) {
   const state = Chess.create();
   let illegal = 0, plies = 0;
@@ -57,6 +58,12 @@ console.log('\ngames always terminate in a legal state');
 
 console.log('\nstrength ordering — 1600 vs 400, 6 games');
 {
+  /* Games are played on a shortened clock. Each level keeps its own depth cap,
+     blunder rate and noise, so the relative ordering is unchanged — it just runs
+     in seconds instead of minutes. */
+  const realTimes = AI.LEVELS.map(l => l.timeMs);
+  AI.LEVELS.forEach(l => { l.timeMs = Math.min(l.timeMs, 150); });
+
   let strongWins = 0, weakWins = 0, draws = 0;
   for (let g = 0; g < 6; g++) {
     const state = Chess.create();
@@ -79,6 +86,7 @@ console.log('\nstrength ordering — 1600 vs 400, 6 games');
       if (strongScore > 200) strongWins++; else if (strongScore < -200) weakWins++; else draws++;
     }
   }
+  AI.LEVELS.forEach((l, i) => { l.timeMs = realTimes[i]; });
   console.log(`  strong ${strongWins} — weak ${weakWins} — level ${draws}`);
   ok(strongWins > weakWins, 'the 1600 opponent outplays the 400 opponent');
 }

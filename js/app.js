@@ -31,6 +31,7 @@
     render();
   }
   SH.go = go;
+  SH.currentSubject = function () { return state.subjectId; };
 
   /* ---------------------------- HUD ---------------------------- */
   function renderHud() {
@@ -45,6 +46,11 @@
     bar.appendChild(el('span', 'stat-pill fire', '🔥 ' + data.streak.current));
     bar.appendChild(el('span', 'stat-pill gem', '💎 ' + data.xp));
     bar.appendChild(el('span', 'stat-pill heart', '❤️ ' + data.hearts.n));
+    var pending = SH.Progress.mistakes().length;
+    var coachBtn = btn('icon-btn coach-btn', '🧑‍🏫', function () { openCoach(); });
+    coachBtn.title = pending ? pending + ' to review' : 'Coach';
+    if (pending) coachBtn.appendChild(el('span', 'badge', pending > 9 ? '9+' : String(pending)));
+    bar.appendChild(coachBtn);
     bar.appendChild(btn('icon-btn', '📊', function () { go('stats'); }));
     bar.appendChild(btn('icon-btn', '👤', function () { go('profile'); }));
     bar.appendChild(btn('icon-btn', SH.Sfx.muted() ? '🔇' : '🔊', function () {
@@ -211,6 +217,20 @@
     card.appendChild(gb);
     wrap.appendChild(card);
 
+    var waiting = SH.Progress.mistakes().length;
+    if (waiting) {
+      var coachCard = el('button', 'play-card coach-card');
+      coachCard.type = 'button';
+      coachCard.appendChild(el('span', 'play-emoji', '🧑‍🏫'));
+      var cb = el('div', 'play-body');
+      cb.appendChild(el('div', 'play-title', waiting + (waiting === 1 ? ' mistake' : ' mistakes') + ' to go over'));
+      cb.appendChild(el('div', 'muted small', 'Work out what went wrong, then answer it again'));
+      coachCard.appendChild(cb);
+      coachCard.appendChild(el('span', 'play-go', '▶'));
+      coachCard.onclick = openCoach;
+      wrap.appendChild(coachCard);
+    }
+
     if (subject.id === 'chess') {
       var play = el('button', 'play-card');
       play.type = 'button';
@@ -301,6 +321,14 @@
     });
 
     appEl.appendChild(wrap);
+  }
+
+  function openCoach() {
+    SH.Sfx.play('tap');
+    state.view = 'lesson';
+    renderHud();
+    appEl.innerHTML = '';
+    SH.startReview(appEl, { onExit: function () { go('path'); } });
   }
 
   function startLesson(subject, topic, lessonIndex, mode) {

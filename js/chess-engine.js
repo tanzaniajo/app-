@@ -62,14 +62,24 @@
       ep: (parts[3] && parts[3] !== '-') ? nameToSq(parts[3]) : -1,
       halfmove: parts[4] ? +parts[4] : 0,
       fullmove: parts[5] ? +parts[5] : 1,
+      /* Repetition tracking builds a position key on every move, which is far too
+         expensive inside a search. The game turns it on; the search leaves it off. */
+      trackHistory: false,
       history: []
     };
-    state.history.push(positionKey(state));
     return state;
   }
 
   var START_FEN = 'rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1';
   function create(fen) { return fromFen(fen || START_FEN); }
+
+  /* A game (as opposed to a search) needs the repetition rule, so it keeps history. */
+  function createGame(fen) {
+    var state = fromFen(fen || START_FEN);
+    state.trackHistory = true;
+    state.history.push(positionKey(state));
+    return state;
+  }
 
   function toFen(state) {
     var rows = [];
@@ -301,13 +311,13 @@
     state.halfmove = (kind === 'p' || move.captured) ? 0 : state.halfmove + 1;
     if (!white) state.fullmove++;
     state.turn = white ? BLACK : WHITE;
-    state.history.push(positionKey(state));
+    if (state.trackHistory) state.history.push(positionKey(state));
     return undo;
   }
 
   function unmake(state, move, undo) {
     var board = state.board;
-    state.history.pop();
+    if (state.trackHistory) state.history.pop();
     state.turn = colorOf(move.piece);
     state.castling = undo.castling;
     state.ep = undo.ep;
@@ -367,6 +377,7 @@
   }
 
   function repetitionCount(state) {
+    if (!state.trackHistory || !state.history.length) return 1;
     var key = state.history[state.history.length - 1];
     var n = 0;
     for (var i = 0; i < state.history.length; i++) if (state.history[i] === key) n++;
@@ -454,7 +465,7 @@
 
   return {
     WHITE: WHITE, BLACK: BLACK, START_FEN: START_FEN,
-    create: create, fromFen: fromFen, toFen: toFen, clone: clone,
+    create: create, createGame: createGame, fromFen: fromFen, toFen: toFen, clone: clone,
     legalMoves: legalMoves, legalCaptures: legalCaptures, pseudoMoves: pseudoMoves,
     make: make, unmake: unmake,
     inCheck: inCheck, attacked: attacked, findKing: findKing,

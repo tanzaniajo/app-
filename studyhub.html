@@ -492,6 +492,42 @@ button { font-family: inherit; }
 .promo-btn .piece { font-size: 1.8rem; color: #1a1a1a; }
 .promo-btn .piece.w { color: #fff; text-shadow: 0 1px 0 #2b2b2b, 0 -1px 0 #2b2b2b, 1px 0 0 #2b2b2b, -1px 0 0 #2b2b2b; }
 .promo-name { font-size: .68rem; font-weight: 800; color: var(--text-dim); text-transform: uppercase; }
+
+/* ---------------- the coach ---------------- */
+.coach-btn { position: relative; }
+.coach-btn .badge {
+  position: absolute; top: 0; right: 0;
+  background: var(--red); color: #fff;
+  font-size: .58rem; font-weight: 800; line-height: 1;
+  padding: 3px 5px; border-radius: 999px;
+}
+.coach-card { border-color: var(--blue); }
+.coach-card .play-go { color: var(--blue); }
+
+.mistake-row { cursor: pointer; text-align: left; font: inherit; }
+.mistake-row:hover { background: var(--sunk); }
+.mistake-row .row-title {
+  display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical;
+  overflow: hidden; font-size: .92rem;
+}
+
+.your-answer {
+  display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+  background: var(--red-tint); color: var(--red-dark);
+  border-radius: 12px; padding: 10px 14px; margin-bottom: 20px;
+}
+.your-label { font-size: .68rem; font-weight: 800; letter-spacing: .1em; text-transform: uppercase; opacity: .8; }
+.your-value { font-weight: 800; font-size: 1.05rem; }
+
+.verdict-box {
+  border-radius: 12px; padding: 14px 16px; margin: 16px 0;
+  font-weight: 800; line-height: 1.5;
+}
+.verdict-box.ok { background: var(--green-tint); color: var(--green-dark); }
+.verdict-box.no { background: var(--red-tint); color: var(--red-dark); }
+.verdict-box .why { font-weight: 700; font-size: .9rem; margin-top: 6px; color: var(--text); opacity: .9; }
+
+textarea.type-answer { resize: vertical; line-height: 1.5; }
 </style>
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>📚</text></svg>">
 </head>
@@ -524,6 +560,7 @@ window.StudyHub = window.StudyHub || {};
     topics: {},          // "subject/topic"   -> { asked, correct, sessions }
     totals: { asked: 0, correct: 0 },
     days: {},            // "YYYY-MM-DD" -> questions answered
+    mistakes: [],        // wrong answers kept for the Coach to review
     goal: 30,            // daily XP goal
     streak: { current: 0, best: 0, last: null }
   };
@@ -646,6 +683,32 @@ window.StudyHub = window.StudyHub || {};
         if (d.streak.current > d.streak.best) d.streak.best = d.streak.current;
       }
 
+      return write(d);
+    },
+
+    /* ---- the mistake log the Coach reviews ---- */
+    MAX_MISTAKES: 60,
+    logMistake: function (record) {
+      var d = Progress.all();
+      record.id = 'm' + Date.now() + Math.floor(Math.random() * 1000);
+      record.ts = Date.now();
+      // the same slip twice is one entry, refreshed
+      d.mistakes = d.mistakes.filter(function (x) {
+        return !(x.prompt === record.prompt && x.given === record.given);
+      });
+      d.mistakes.unshift(record);
+      if (d.mistakes.length > Progress.MAX_MISTAKES) d.mistakes.length = Progress.MAX_MISTAKES;
+      return write(d);
+    },
+    mistakes: function () { return Progress.all().mistakes; },
+    removeMistake: function (id) {
+      var d = Progress.all();
+      d.mistakes = d.mistakes.filter(function (x) { return x.id !== id; });
+      return write(d);
+    },
+    clearMistakes: function () {
+      var d = Progress.all();
+      d.mistakes = [];
       return write(d);
     },
 
@@ -1007,14 +1070,24 @@ window.StudyHub = window.StudyHub || {};
       ep: (parts[3] && parts[3] !== '-') ? nameToSq(parts[3]) : -1,
       halfmove: parts[4] ? +parts[4] : 0,
       fullmove: parts[5] ? +parts[5] : 1,
+      /* Repetition tracking builds a position key on every move, which is far too
+         expensive inside a search. The game turns it on; the search leaves it off. */
+      trackHistory: false,
       history: []
     };
-    state.history.push(positionKey(state));
     return state;
   }
 
   var START_FEN = 'rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1';
   function create(fen) { return fromFen(fen || START_FEN); }
+
+  /* A game (as opposed to a search) needs the repetition rule, so it keeps history. */
+  function createGame(fen) {
+    var state = fromFen(fen || START_FEN);
+    state.trackHistory = true;
+    state.history.push(positionKey(state));
+    return state;
+  }
 
   function toFen(state) {
     var rows = [];
@@ -1246,13 +1319,13 @@ window.StudyHub = window.StudyHub || {};
     state.halfmove = (kind === 'p' || move.captured) ? 0 : state.halfmove + 1;
     if (!white) state.fullmove++;
     state.turn = white ? BLACK : WHITE;
-    state.history.push(positionKey(state));
+    if (state.trackHistory) state.history.push(positionKey(state));
     return undo;
   }
 
   function unmake(state, move, undo) {
     var board = state.board;
-    state.history.pop();
+    if (state.trackHistory) state.history.pop();
     state.turn = colorOf(move.piece);
     state.castling = undo.castling;
     state.ep = undo.ep;
@@ -1312,6 +1385,7 @@ window.StudyHub = window.StudyHub || {};
   }
 
   function repetitionCount(state) {
+    if (!state.trackHistory || !state.history.length) return 1;
     var key = state.history[state.history.length - 1];
     var n = 0;
     for (var i = 0; i < state.history.length; i++) if (state.history[i] === key) n++;
@@ -1399,7 +1473,7 @@ window.StudyHub = window.StudyHub || {};
 
   return {
     WHITE: WHITE, BLACK: BLACK, START_FEN: START_FEN,
-    create: create, fromFen: fromFen, toFen: toFen, clone: clone,
+    create: create, createGame: createGame, fromFen: fromFen, toFen: toFen, clone: clone,
     legalMoves: legalMoves, legalCaptures: legalCaptures, pseudoMoves: pseudoMoves,
     make: make, unmake: unmake,
     inCheck: inCheck, attacked: attacked, findKing: findKing,
@@ -1541,12 +1615,23 @@ window.StudyHub = window.StudyHub || {};
   }
 
   /* Search captures only, so we never stop counting in the middle of a trade. */
+  function outOfTime(budget) {
+    if (budget.stop) return true;
+    if (budget.nodes > budget.max) { budget.stop = true; return true; }
+    // checking the clock is not free, so only do it every so often
+    if ((budget.nodes & 2047) === 0 && budget.deadline && Date.now() > budget.deadline) {
+      budget.stop = true;
+      return true;
+    }
+    return false;
+  }
+
   function quiesce(state, alpha, beta, budget) {
     budget.nodes++;
     var stand = evaluate(state);
     if (stand >= beta) return beta;
     if (stand > alpha) alpha = stand;
-    if (budget.nodes > budget.max) return alpha;
+    if (outOfTime(budget)) return alpha;
 
     var captures = ordered(Chess.legalCaptures(state));
     for (var i = 0; i < captures.length; i++) {
@@ -1561,7 +1646,7 @@ window.StudyHub = window.StudyHub || {};
 
   function negamax(state, depth, alpha, beta, ply, budget) {
     budget.nodes++;
-    if (budget.nodes > budget.max) return evaluate(state);
+    if (outOfTime(budget)) return evaluate(state);
 
     var moves = Chess.legalMoves(state);
     if (moves.length === 0) {
@@ -1581,32 +1666,61 @@ window.StudyHub = window.StudyHub || {};
     return alpha;
   }
 
-  /* Score every legal move at the given depth. */
-  function rankMoves(state, depth, maxNodes) {
-    var budget = { nodes: 0, max: maxNodes || 400000 };
+  /* How far below the best a root move may score and still be scored exactly.
+     It must exceed the widest "noise" window any level uses. */
+  var ROOT_WINDOW = 200;
+
+  /* Search the root with iterative deepening.
+
+     Two things keep this fast enough to play in a browser without freezing it:
+     the alpha bound is carried from one root move to the next instead of every
+     move starting from scratch, and each deeper iteration reorders the moves by
+     the previous iteration's scores. A wall-clock deadline stops the search
+     wherever it is, and the last completed depth is the one that gets used. */
+  function rankMoves(state, depth, maxNodes, timeMs) {
+    var budget = { nodes: 0, max: maxNodes || 400000, deadline: timeMs ? Date.now() + timeMs : 0, stop: false };
     var moves = ordered(Chess.legalMoves(state));
-    var scored = [];
-    for (var i = 0; i < moves.length; i++) {
-      var undo = Chess.make(state, moves[i]);
-      var score = -negamax(state, depth - 1, -MATE, MATE, 1, budget);
-      Chess.unmake(state, moves[i], undo);
-      scored.push({ move: moves[i], score: score });
+    var result = moves.map(function (m) { return { move: m, score: 0 }; });
+    if (moves.length <= 1) return { moves: result, nodes: 0, depth: 0 };
+
+    var reached = 0;
+    for (var d = 1; d <= depth; d++) {
+      var scored = [], alpha = -MATE, aborted = false;
+
+      for (var i = 0; i < moves.length; i++) {
+        var undo = Chess.make(state, moves[i]);
+        // moves far below the best cannot matter, so search those in a narrow window
+        var lower = i === 0 ? -MATE : alpha - ROOT_WINDOW;
+        var score = -negamax(state, d - 1, -MATE, -lower, 1, budget);
+        Chess.unmake(state, moves[i], undo);
+        if (budget.stop) { aborted = true; break; }
+        scored.push({ move: moves[i], score: score });
+        if (score > alpha) alpha = score;
+      }
+
+      if (aborted) break;
+      scored.sort(function (a, b) { return b.score - a.score; });
+      result = scored;
+      reached = d;
+      moves = scored.map(function (x) { return x.move; });      // best-first next time
+      if (Math.abs(result[0].score) > MATE - 1000) break;       // mate found, stop early
+      if (budget.deadline && Date.now() > budget.deadline) break;
     }
-    scored.sort(function (a, b) { return b.score - a.score; });
-    return { moves: scored, nodes: budget.nodes };
+
+    return { moves: result, nodes: budget.nodes, depth: reached };
   }
 
   var LEVELS = [
     { elo: 400,  name: 'Beginner',     blurb: 'Misses simple threats and gives pieces away',
-      depth: 1, blunder: 0.45, noise: 150, nodes: 30000 },
+      depth: 1, blunder: 0.45, noise: 150, nodes: 40000,   timeMs: 120 },
     { elo: 800,  name: 'Casual',       blurb: 'Takes free material, overlooks tactics',
-      depth: 2, blunder: 0.22, noise: 90,  nodes: 80000 },
+      depth: 2, blunder: 0.22, noise: 90,  nodes: 120000,  timeMs: 250 },
     { elo: 1200, name: 'Club player',  blurb: 'Punishes hanging pieces and one-move threats',
-      depth: 3, blunder: 0.08, noise: 45,  nodes: 200000 },
+      depth: 4, blunder: 0.08, noise: 45,  nodes: 400000,  timeMs: 600 },
     { elo: 1600, name: 'Strong',       blurb: 'Sees short tactics and defends accurately',
-      depth: 4, blunder: 0.02, noise: 18,  nodes: 400000 },
-    { elo: 2000, name: 'Expert',       blurb: 'Deep search, no deliberate mistakes',
-      depth: 5, blunder: 0,    noise: 0,   nodes: 900000 }
+      depth: 6, blunder: 0.02, noise: 18,  nodes: 1200000, timeMs: 1200 },
+    { elo: 2000, name: 'Expert',       blurb: 'Searches as deep as the time allows',
+      depth: 8, blunder: 0,    noise: 0,   nodes: 3000000, timeMs: 2000 }
   ];
 
   function levelFor(elo) {
@@ -1628,7 +1742,7 @@ window.StudyHub = window.StudyHub || {};
       return { move: pool[Math.floor(Math.random() * pool.length)], level: level, blundered: true };
     }
 
-    var ranked = rankMoves(state, level.depth, level.nodes);
+    var ranked = rankMoves(state, level.depth, level.nodes, level.timeMs);
     var best = ranked.moves[0];
 
     // among moves close to the best, choose freely — this is what makes a
@@ -1637,7 +1751,8 @@ window.StudyHub = window.StudyHub || {};
     var candidates = ranked.moves.filter(function (m) { return best.score - m.score <= window; });
     var pick = candidates[Math.floor(Math.random() * candidates.length)] || best;
 
-    return { move: pick.move, score: pick.score, best: best.score, level: level, nodes: ranked.nodes };
+    return { move: pick.move, score: pick.score, best: best.score, level: level,
+             nodes: ranked.nodes, depth: ranked.depth };
   }
 
   return {
@@ -3755,6 +3870,341 @@ window.StudyHub = window.StudyHub || {};
 })(window.StudyHub);
 </script>
 <script>
+/* The Coach: works out what specifically went wrong in a question you got wrong,
+   then walks you through it — you say what you think your mistake was, it tells you
+   whether you're right, then you rewrite the answer and it checks that too.
+
+   This is deterministic analysis, not a language model. It can be this specific
+   because it already knows the question, your answer, the right answer and the
+   reasoning — so it compares them and recognises the classic error patterns
+   (sign slips, order of operations, area vs perimeter, tone errors, doubled
+   letters, synonym-for-antonym, and so on). It runs offline with everything else. */
+(function (SH) {
+  'use strict';
+
+  /* ------------------------------ utilities ------------------------------ */
+
+  function norm(s) {
+    return String(s == null ? '' : s).toLowerCase().trim()
+      .replace(/[“”"']/g, '').replace(/\s+/g, ' ').replace(/[.,!?;:]+$/, '');
+  }
+
+  /* Pull a number out of "$12.50", "48 cm²", "3/4", "25%". */
+  function numberOf(text) {
+    if (text == null) return null;
+    var s = String(text).replace(/[$,\s]/g, '');
+    var frac = s.match(/^(-?\d+)\/(\d+)$/);
+    if (frac) return +frac[1] / +frac[2];
+    var m = s.match(/-?\d+(?:\.\d+)?/);
+    if (!m) return null;
+    return parseFloat(m[0]);
+  }
+
+  function numbersIn(text) {
+    var out = [], m, re = /-?\d+(?:\.\d+)?/g;
+    while ((m = re.exec(String(text)))) out.push(parseFloat(m[0]));
+    return out;
+  }
+
+  function close(a, b) { return a != null && b != null && Math.abs(a - b) < 1e-6; }
+
+  /* Pull a chain like "12 - 4 * 2" out of a prompt and work it out twice:
+     once strictly left to right, once respecting precedence. If the learner's
+     answer matches the left-to-right value, that IS the mistake. */
+  function operatorChain(text) {
+    var s = String(text).replace(/×/g, '*').replace(/÷/g, '/').replace(/[−–]/g, '-');
+    var m = s.match(/\d+(?:\.\d+)?(?:\s*[-+*\/]\s*\d+(?:\.\d+)?){1,}/);
+    if (!m) return null;
+    var tokens = m[0].replace(/\s+/g, '').match(/\d+(?:\.\d+)?|[-+*\/]/g);
+    if (!tokens || tokens.length < 5) return null;      // needs at least two operators
+
+    function apply(a, op, b) {
+      return op === '+' ? a + b : op === '-' ? a - b : op === '*' ? a * b : a / b;
+    }
+
+    var i;
+    var l2r = parseFloat(tokens[0]);
+    for (i = 1; i < tokens.length; i += 2) l2r = apply(l2r, tokens[i], parseFloat(tokens[i + 1]));
+
+    var pass = [parseFloat(tokens[0])];
+    for (i = 1; i < tokens.length; i += 2) {
+      var op = tokens[i], rhs = parseFloat(tokens[i + 1]);
+      if (op === '*' || op === '/') pass[pass.length - 1] = apply(pass[pass.length - 1], op, rhs);
+      else { pass.push(op); pass.push(rhs); }
+    }
+    var proper = pass[0];
+    for (i = 1; i < pass.length; i += 2) proper = apply(proper, pass[i], pass[i + 1]);
+
+    return { l2r: l2r, proper: proper, text: m[0] };
+  }
+
+  var TONE_BASE = { 'ā':'a','á':'a','ǎ':'a','à':'a','ē':'e','é':'e','ě':'e','è':'e',
+                    'ī':'i','í':'i','ǐ':'i','ì':'i','ō':'o','ó':'o','ǒ':'o','ò':'o',
+                    'ū':'u','ú':'u','ǔ':'u','ù':'u','ǖ':'ü','ǘ':'ü','ǚ':'ü','ǜ':'ü' };
+  var TONE_NUMBER = { 'ā':1,'á':2,'ǎ':3,'à':4,'ē':1,'é':2,'ě':3,'è':4,'ī':1,'í':2,'ǐ':3,'ì':4,
+                      'ō':1,'ó':2,'ǒ':3,'ò':4,'ū':1,'ú':2,'ǔ':3,'ù':4,'ǖ':1,'ǘ':2,'ǚ':3,'ǜ':4 };
+  function stripTones(s) {
+    return String(s).split('').map(function (c) { return TONE_BASE[c] || c; }).join('');
+  }
+  function toneNumbers(s) {
+    var out = [];
+    String(s).split('').forEach(function (c) { if (TONE_NUMBER[c]) out.push(TONE_NUMBER[c]); });
+    return out;
+  }
+  function isPinyin(s) { return /^[a-zA-Züǖǘǚǜāáǎàēéěèīíǐìōóǒòūúǔù' ]+$/.test(String(s)); }
+  function hasHanzi(s) { return /[㐀-鿿]/.test(String(s)); }
+  function sharedChars(a, b) {
+    var set = {}, out = [];
+    String(a).split('').forEach(function (c) { set[c] = true; });
+    String(b).split('').forEach(function (c) { if (set[c] && out.indexOf(c) === -1 && /[㐀-鿿]/.test(c)) out.push(c); });
+    return out;
+  }
+
+  /* First point where two spellings differ, described in words. */
+  function spellingDiff(given, right) {
+    var g = norm(given), r = norm(right);
+    for (var i = 0; i < Math.max(g.length, r.length); i++) {
+      if (g.charAt(i) !== r.charAt(i)) {
+        var gc = g.charAt(i) || '(nothing)', rc = r.charAt(i) || '(nothing)';
+        // doubled-letter mistakes are the most common, so name them directly
+        var rDouble = r.charAt(i) === r.charAt(i + 1);
+        var gDouble = g.charAt(i) === g.charAt(i + 1);
+        if (rDouble && !gDouble) return 'you wrote one "' + rc + '" where the word has two';
+        if (gDouble && !rDouble) return 'you doubled the "' + gc + '" — it only has one';
+        if (g.length < r.length) return 'you left out the "' + rc + '"';
+        if (g.length > r.length) return 'you added an extra "' + gc + '"';
+        return 'you wrote "' + gc + '" where it should be "' + rc + '"';
+      }
+    }
+    return 'the letters are in a different order';
+  }
+
+  /* ---------------------------- the diagnosis ---------------------------- */
+  /* Returns { cause, accept, hints } where `accept` lists keyword groups that
+     count as correctly identifying the mistake. */
+
+  function diagnoseMath(m) {
+    var given = numberOf(m.given), right = numberOf(m.answer);
+    var nums = numbersIn(m.prompt);
+    var p = String(m.prompt);
+
+    if (given != null && right != null) {
+      if (close(given, -right)) return {
+        cause: 'You have the right size but the wrong sign — the answer is ' + (right < 0 ? 'negative' : 'positive') + ', not ' + (given < 0 ? 'negative' : 'positive') + '.',
+        accept: [['sign', 'negative', 'positive', 'minus', 'plus']],
+        hints: ['I got the sign the wrong way round', 'I multiplied instead of adding', 'I misread a number', 'I used the wrong formula']
+      };
+      if (close(Math.abs(given - right), 1)) return {
+        cause: 'You are out by exactly one — a counting or carrying slip rather than the wrong method.',
+        accept: [['off by one', 'one out', 'counting', 'carry', 'carrying', 'miscounted', 'by 1', 'by one']],
+        hints: ['I was out by one', 'I used the wrong operation', 'I misread the question', 'I forgot a step']
+      };
+      if (close(given, right * 2)) return {
+        cause: 'Your answer is exactly double the right one — the most common cause is forgetting to halve, as in the ½ × base × height of a triangle.',
+        accept: [['double', 'twice', 'halve', 'half', 'divide by 2', 'forgot to halve']],
+        hints: ['I forgot to halve it', 'I got the sign wrong', 'I added instead of multiplying', 'I misread the numbers']
+      };
+      if (close(given, right / 2)) return {
+        cause: 'Your answer is exactly half the right one — you halved something that should not have been halved, or missed a doubling step.',
+        accept: [['half', 'halved', 'double', 'doubling', 'divided by 2']],
+        hints: ['I halved it when I should not have', 'I got the sign wrong', 'I misread a number', 'I used the wrong formula']
+      };
+      if (close(given, right * 100) || close(given, right / 100)) return {
+        cause: 'You are out by a factor of 100 — that is the percent-to-decimal step: 25% means 0.25, not 25.',
+        accept: [['percent', 'decimal', '100', 'hundred', 'place value', 'point']],
+        hints: ['I mixed up the percentage and the decimal', 'I added instead of multiplying', 'I was out by one', 'I used the wrong formula']
+      };
+      var chain = operatorChain(p);
+      if (chain && close(given, chain.l2r) && close(right, chain.proper) && !close(chain.l2r, chain.proper)) return {
+        cause: 'You worked "' + chain.text + '" straight from left to right. Multiplication and division come before addition and subtraction, so that part happens first — which gives ' + chain.proper + ', not ' + chain.l2r + '.',
+        accept: [['order', 'bodmas', 'bidmas', 'pemdas', 'left to right', 'brackets', 'first', 'operations', 'precedence']],
+        hints: ['I did the operations in the wrong order', 'I made an arithmetic slip', 'I misread a number', 'I used the wrong formula']
+      };
+
+      if (nums.length >= 2) {
+        var a = nums[0], b = nums[1], c = nums[2];
+        if (close(given, a + b) && close(right, a * b)) return {
+          cause: 'You added ' + a + ' and ' + b + ' where the question needed you to multiply them.',
+          accept: [['add', 'added', 'plus', 'sum', 'multiply', 'times', 'multiplied']],
+          hints: ['I added instead of multiplying', 'I got the sign wrong', 'I was out by one', 'I misread the question']
+        };
+        if (close(given, a * b) && close(right, a + b)) return {
+          cause: 'You multiplied ' + a + ' and ' + b + ' where the question needed you to add them.',
+          accept: [['multiply', 'multiplied', 'times', 'add', 'adding', 'plus']],
+          hints: ['I multiplied instead of adding', 'I was out by one', 'I got the sign wrong', 'I used the wrong formula']
+        };
+        if (c != null && close(given, (a + b) * c) && close(right, a + b * c)) return {
+          cause: 'You worked left to right. Multiplication comes before addition, so ' + b + ' × ' + c + ' happens first.',
+          accept: [['order', 'bodmas', 'bidmas', 'pemdas', 'left to right', 'brackets', 'multiplication first', 'operations']],
+          hints: ['I did the operations in the wrong order', 'I added instead of multiplying', 'I misread a number', 'I was out by one']
+        };
+        if (close(given, 2 * (a + b)) && close(right, a * b)) return {
+          cause: 'You found the perimeter instead of the area. Perimeter adds the sides; area multiplies them.',
+          accept: [['perimeter', 'area', 'formula', 'wrong formula']],
+          hints: ['I used the perimeter formula instead of area', 'I added instead of multiplying', 'I was out by one', 'I misread the units']
+        };
+        if (close(given, a * b) && close(right, 2 * (a + b))) return {
+          cause: 'You found the area instead of the perimeter. Perimeter is the distance all the way round.',
+          accept: [['perimeter', 'area', 'formula', 'wrong formula']],
+          hints: ['I used the area formula instead of perimeter', 'I multiplied instead of adding', 'I was out by one', 'I misread the units']
+        };
+      }
+      // fraction added straight across: 1/2 + 1/3 answered as 2/5
+      var gf = String(m.given).match(/^(\d+)\/(\d+)$/), pf = p.match(/(\d+)\/(\d+)\s*\+\s*(\d+)\/(\d+)/);
+      if (gf && pf && +gf[1] === +pf[1] + +pf[3] && +gf[2] === +pf[2] + +pf[4]) return {
+        cause: 'You added the tops and the bottoms separately. Fractions must be given a common denominator first.',
+        accept: [['denominator', 'common', 'bottom', 'across', 'separately', 'top']],
+        hints: ['I added the tops and bottoms separately', 'I forgot to simplify', 'I was out by one', 'I multiplied instead']
+      };
+      return {
+        cause: 'The method was not the problem so much as the arithmetic: you answered ' + m.given + ' where the correct value is ' + right + '. Work it through one step at a time.',
+        accept: [['arithmetic', 'slip', 'calculation', 'miscalculated', 'careless', 'mental', 'rushed', 'added', 'subtracted', 'multiplied', 'divided', 'misread']],
+        hints: ['I made an arithmetic slip', 'I used the wrong formula', 'I misread the question', 'I did the steps in the wrong order']
+      };
+    }
+
+    return {
+      cause: 'You chose "' + m.given + '" where the answer is "' + m.answer + '". ' + (m.explanation || ''),
+      accept: [['formula', 'method', 'misread', 'wrong', 'steps', 'order', 'rule']],
+      hints: ['I used the wrong method', 'I misread the question', 'I rushed the arithmetic', 'I did not know the rule']
+    };
+  }
+
+  function diagnoseChinese(m) {
+    var given = String(m.given), right = String(m.answer);
+
+    if (isPinyin(given) && isPinyin(right) && stripTones(given) === stripTones(right)) {
+      var g = toneNumbers(given), r = toneNumbers(right);
+      var where = '';
+      for (var i = 0; i < Math.max(g.length, r.length); i++) {
+        if (g[i] !== r[i]) { where = ' The tone on syllable ' + (i + 1) + ' should be ' + (r[i] || 'neutral') + ', not ' + (g[i] || 'neutral') + '.'; break; }
+      }
+      return {
+        cause: 'The syllables were right — the tones were not.' + where + ' In Chinese a tone is part of the word, not decoration.',
+        accept: [['tone', 'tones', 'accent', 'mark', 'pitch', 'wrong tone']],
+        hints: ['I got the tone wrong', 'I picked the wrong syllable', 'I confused it with another word', 'I did not know the word']
+      };
+    }
+
+    if (hasHanzi(given) && hasHanzi(right)) {
+      var shared = sharedChars(given, right);
+      if (shared.length) return {
+        cause: 'You picked a word that shares the character ' + shared.join('') + ' with the right answer. Sharing a character does not mean sharing a meaning — 电脑, 电视 and 电话 all start with 电.',
+        accept: [['similar', 'looks like', 'look alike', 'shares', 'same character', 'confused', 'mixed up', 'similar character', 'looked similar']],
+        hints: ['I confused it with a word that looks similar', 'I got the tone wrong', 'I guessed', 'I remembered the wrong meaning']
+      };
+      return {
+        cause: 'You chose ' + given + ' where the answer is ' + right + '. These are different words, so this is recall rather than a slip — worth adding to your flashcards.',
+        accept: [['did not know', 'didnt know', 'dont know', 'forgot', 'guess', 'guessed', 'recall', 'remember', 'memor']],
+        hints: ['I did not know the word', 'I confused two similar words', 'I got the tone wrong', 'I misread the question']
+      };
+    }
+
+    return {
+      cause: 'You answered "' + given + '" where the answer is "' + right + '". ' + (m.explanation || ''),
+      accept: [['tone', 'character', 'meaning', 'forgot', 'guess', 'confused', 'did not know', 'didnt know']],
+      hints: ['I did not know it', 'I confused two similar words', 'I got the tone wrong', 'I misread the question']
+    };
+  }
+
+  function diagnoseEnglish(m) {
+    var kicker = norm(m.kicker), prompt = norm(m.prompt);
+
+    if (kicker.indexOf('spelling') !== -1 || prompt.indexOf('spelled') !== -1) {
+      return {
+        cause: 'Spelling: ' + spellingDiff(m.given, m.answer) + '.',
+        accept: [['spell', 'spelling', 'letter', 'letters', 'double', 'missed', 'missing', 'extra', 'typo']],
+        hints: ['I spelled it wrong', 'I did not know the word', 'I misread the options', 'I confused it with another word']
+      };
+    }
+
+    if (prompt.indexOf('opposite') !== -1) {
+      return {
+        cause: 'The question asked for the opposite, and you gave a word with a similar meaning instead. Read whether it wants a synonym or an antonym before choosing.',
+        accept: [['opposite', 'antonym', 'synonym', 'similar', 'misread', 'read the question', 'backwards', 'reversed']],
+        hints: ['I gave a similar word instead of an opposite', 'I did not know the word', 'I guessed', 'I misread the options']
+      };
+    }
+
+    if (kicker.indexOf('sentence') !== -1 || kicker.indexOf('gap') !== -1 || kicker.indexOf('grammar') !== -1) {
+      return {
+        cause: 'A grammar rule decided this one: ' + (m.explanation || 'the form you chose does not fit the sentence.'),
+        accept: [['grammar', 'tense', 'rule', 'agreement', 'plural', 'singular', 'preposition', 'article', 'form', 'verb']],
+        hints: ['I did not know the grammar rule', 'It sounded right so I guessed', 'I misread the sentence', 'I confused two similar forms']
+      };
+    }
+
+    return {
+      cause: 'You chose "' + m.given + '" where the answer is "' + m.answer + '". ' + (m.explanation || ''),
+      accept: [['meaning', 'definition', 'confused', 'did not know', 'didnt know', 'forgot', 'guess', 'mixed up', 'similar']],
+      hints: ['I did not know the word', 'I confused it with a similar word', 'I guessed', 'I misread the question']
+    };
+  }
+
+  function diagnoseScience(m) {
+    return {
+      cause: 'You chose "' + m.given + '". ' + (m.explanation || 'The correct answer is "' + m.answer + '".'),
+      accept: [['did not know', 'didnt know', 'dont know', 'forgot', 'guess', 'guessed', 'confused', 'mixed up',
+                'misread', 'wrong', 'remember', 'misunderstood', 'thought']],
+      hints: ['I mixed up two similar ideas', 'I did not know this fact', 'I guessed', 'I misread the question']
+    };
+  }
+
+  function diagnose(m) {
+    var d;
+    if (m.subject === 'math') d = diagnoseMath(m);
+    else if (m.subject === 'chinese') d = diagnoseChinese(m);
+    else if (m.subject === 'english') d = diagnoseEnglish(m);
+    else d = diagnoseScience(m);
+    d.hints = (d.hints || []).slice(0, 4);
+    return d;
+  }
+
+  /* Did the learner correctly identify their own mistake? */
+  function matchDiagnosis(text, diagnosis) {
+    var t = norm(text);
+    if (!t) return { ok: false, empty: true };
+    if (/^(i (dont|do not|don't) know|no idea|not sure|dunno)$/.test(t)) return { ok: false, unsure: true };
+
+    var groups = diagnosis.accept || [];
+    for (var i = 0; i < groups.length; i++) {
+      for (var j = 0; j < groups[i].length; j++) {
+        if (t.indexOf(groups[i][j]) !== -1) return { ok: true, matched: groups[i][j] };
+      }
+    }
+    return { ok: false };
+  }
+
+  /* Did their rewritten answer match? */
+  function checkAnswer(text, mistake) {
+    var given = norm(text);
+    if (!given) return { ok: false, empty: true };
+    var right = norm(mistake.answer);
+    if (given === right) return { ok: true };
+
+    var a = numberOf(text), b = numberOf(mistake.answer);
+    if (a != null && b != null && close(a, b)) return { ok: true, loose: 'the number is right' };
+
+    // allow the answer with or without units, and "the" / "a" in front
+    var stripped = given.replace(/^(the|a|an)\s+/, '').replace(/[^a-z0-9㐀-鿿\/=+\-.]/g, '');
+    var rightStripped = right.replace(/^(the|a|an)\s+/, '').replace(/[^a-z0-9㐀-鿿\/=+\-.]/g, '');
+    if (stripped && stripped === rightStripped) return { ok: true, loose: 'wording differs slightly' };
+
+    if (given === norm(mistake.given)) return { ok: false, repeated: true };
+    return { ok: false };
+  }
+
+  SH.Coach = {
+    diagnose: diagnose,
+    matchDiagnosis: matchDiagnosis,
+    checkAnswer: checkAnswer,
+    norm: norm,
+    numberOf: numberOf,
+    spellingDiff: spellingDiff
+  };
+})(window.StudyHub);
+</script>
+<script>
 /* The lesson runner: one screen at a time, hearts, check-then-continue. */
 (function (SH) {
   'use strict';
@@ -3887,8 +4337,23 @@ window.StudyHub = window.StudyHub || {};
         this.hearts = SH.Progress.loseHeart();
         sfx('heart');
       }
+      this.recordMistake(q, right);
     }
     this.draw();
+  };
+
+  /* Wrong answers are kept so the Coach can walk you back through them.
+     Chess is left out: its questions are positions, not written answers. */
+  Lesson.prototype.recordMistake = function (q, wasRight) {
+    if (wasRight || this.subject.id === 'chess') return;
+    var entry = this.log[this.log.length - 1];
+    if (!entry) return;
+    SH.Progress.logMistake({
+      subject: this.subject.id, subjectName: this.subject.name, emoji: this.subject.emoji,
+      topic: this.topic.id, topicName: this.topic.name,
+      kicker: q.kicker || '', prompt: q.prompt, passage: q.passage || '',
+      given: entry.given, answer: entry.answer, explanation: q.explanation || ''
+    });
   };
 
   Lesson.prototype.advance = function () {
@@ -4288,7 +4753,7 @@ window.StudyHub = window.StudyHub || {};
 
   function startGame(root, elo, playerColor, onExit) {
     var game = {
-      state: Chess.create(),
+      state: Chess.createGame(),
       elo: elo,
       level: AI.levelFor(elo),
       player: playerColor,
@@ -4590,7 +5055,7 @@ window.StudyHub = window.StudyHub || {};
       move: function (from, to) { playerMove(Chess.nameToSq(from), Chess.nameToSq(to)); },
       select: function (name) { selectSquare(Chess.nameToSq(name)); },
       load: function (fen) {
-        game.state = Chess.fromFen(fen);
+        game.state = Chess.createGame(fen);
         game.history = [];
         game.lastMove = null;
         game.selected = -1;
@@ -4611,6 +5076,366 @@ window.StudyHub = window.StudyHub || {};
   SH.startPlay = function (root, opts) {
     renderPicker(root, opts.onExit);
   };
+})(window.StudyHub);
+</script>
+<script>
+/* The Coach screens: pick a question you got wrong, say what you think went
+   wrong, get corrected, rewrite the answer, get corrected again. */
+(function (SH) {
+  'use strict';
+
+  var Coach = SH.Coach;
+
+  function el(tag, cls, text) {
+    var n = document.createElement(tag);
+    if (cls) n.className = cls;
+    if (text != null) n.textContent = text;
+    return n;
+  }
+  function btn(cls, text, onClick) {
+    var b = el('button', cls, text);
+    b.type = 'button';
+    b.onclick = onClick;
+    return b;
+  }
+  function sfx(n) { if (SH.Sfx) SH.Sfx.play(n); }
+
+  /* Work out a plain arithmetic question, so a pasted sum can be marked
+     even when you do not know the right answer yourself. */
+  function trySolve(text) {
+    var expr = String(text).replace(/[×x]/g, '*').replace(/[÷]/g, '/').replace(/[−–]/g, '-')
+      .replace(/\^/g, '**').replace(/=\s*\?*\s*$/, '').replace(/[?]/g, '').trim();
+    if (!/^[-+*/(). \d]+(\*\*[\d.]+)?$/.test(expr.replace(/\*\*/g, '**'))) return null;
+    if (!/\d/.test(expr) || !/[-+*/]/.test(expr)) return null;
+    try {
+      // a tiny shunting-yard evaluator — no eval, no globals reachable
+      var value = evaluate(expr);
+      return (value == null || !isFinite(value)) ? null : String(Math.round(value * 1e6) / 1e6);
+    } catch (e) { return null; }
+  }
+
+  function evaluate(src) {
+    var tokens = src.match(/\d+(?:\.\d+)?|\*\*|[-+*/()]/g);
+    if (!tokens) return null;
+    var pos = 0;
+    function peek() { return tokens[pos]; }
+    function next() { return tokens[pos++]; }
+    function primary() {
+      var t = next();
+      if (t === '(') { var v = addsub(); next(); return v; }
+      if (t === '-') return -primary();
+      return parseFloat(t);
+    }
+    function power() {
+      var base = primary();
+      if (peek() === '**') { next(); return Math.pow(base, power()); }
+      return base;
+    }
+    function muldiv() {
+      var v = power();
+      while (peek() === '*' || peek() === '/') {
+        var op = next();
+        var rhs = power();
+        v = op === '*' ? v * rhs : v / rhs;
+      }
+      return v;
+    }
+    function addsub() {
+      var v = muldiv();
+      while (peek() === '+' || peek() === '-') {
+        var op = next();
+        var rhs = muldiv();
+        v = op === '+' ? v + rhs : v - rhs;
+      }
+      return v;
+    }
+    var result = addsub();
+    return pos === tokens.length ? result : null;
+  }
+
+  /* ------------------------------ list screen ------------------------------ */
+
+  function renderList(root, onExit) {
+    root.innerHTML = '';
+    var mistakes = SH.Progress.mistakes();
+
+    var top = el('div', 'lesson-top');
+    top.appendChild(btn('close-x', '✕', onExit));
+    top.appendChild(el('div', 'quiz-count', 'Coach'));
+    top.appendChild(el('div', 'hud-spacer'));
+    root.appendChild(top);
+
+    var wrap = el('div', 'wrap');
+    wrap.appendChild(el('div', 'mascot center', '🧑‍🏫'));
+    wrap.appendChild(el('h1', 'center', 'Go over your mistakes'));
+    wrap.appendChild(el('p', 'muted center',
+      'Pick a question you got wrong. You say what went wrong, the Coach tells you whether you are right, then you write the answer again.'));
+
+    wrap.appendChild(btn('btn btn--blue btn--wide', '＋ Add a question yourself',
+      function () { renderOwn(root, onExit); }));
+
+    if (!mistakes.length) {
+      var empty = el('div', 'empty');
+      empty.appendChild(el('div', null, 'Nothing to review yet.'));
+      empty.appendChild(el('div', 'small', 'Wrong answers from your lessons appear here automatically.'));
+      wrap.appendChild(empty);
+      root.appendChild(wrap);
+      return;
+    }
+
+    wrap.appendChild(el('h2', 'section-head', ''));
+    wrap.lastChild.appendChild(el('h2', null, mistakes.length + ' to review'));
+    wrap.lastChild.appendChild(btn('link', 'Clear all', function () {
+      SH.Progress.clearMistakes();
+      renderList(root, onExit);
+    }));
+
+    var rows = el('div', 'rows');
+    mistakes.forEach(function (m) {
+      var row = el('button', 'row mistake-row');
+      row.type = 'button';
+      var main = el('div', 'row-main');
+      main.appendChild(el('div', 'row-title', (m.emoji || '📘') + '  ' + m.prompt));
+      main.appendChild(el('div', 'row-sub', m.subjectName + ' · ' + m.topicName + ' — you answered "' + m.given + '"'));
+      row.appendChild(main);
+      row.appendChild(el('div', 'row-num', '›'));
+      row.onclick = function () { sfx('tap'); renderReview(root, m, onExit); };
+      rows.appendChild(row);
+    });
+    wrap.appendChild(rows);
+    root.appendChild(wrap);
+    window.scrollTo(0, 0);
+  }
+
+  /* --------------------------- add your own question --------------------------- */
+
+  function renderOwn(root, onExit) {
+    root.innerHTML = '';
+    var top = el('div', 'lesson-top');
+    top.appendChild(btn('close-x', '✕', function () { renderList(root, onExit); }));
+    top.appendChild(el('div', 'quiz-count', 'Your own question'));
+    top.appendChild(el('div', 'hud-spacer'));
+    root.appendChild(top);
+
+    var wrap = el('div', 'wrap');
+    wrap.appendChild(el('h1', null, 'Add a question you got wrong'));
+    wrap.appendChild(el('p', 'muted', 'Type the question and the answer you gave. If you know the right answer, add it — otherwise the Coach will work out plain sums on its own.'));
+
+    var subject = SH.currentSubject && SH.currentSubject() !== 'chess' ? SH.currentSubject() : 'math';
+    var chips = el('div', 'mode-row');
+    [['math', '🔢 Math'], ['english', '📖 English'], ['science', '🔬 Science'], ['chinese', '🀄 Chinese']].forEach(function (s) {
+      var c = el('button', 'chip' + (s[0] === subject ? ' on' : ''));
+      c.type = 'button';
+      c.textContent = s[1];
+      c.onclick = function () {
+        subject = s[0];
+        chips.querySelectorAll('.chip').forEach(function (x, i) {
+          x.className = 'chip' + (['math', 'english', 'science', 'chinese'][i] === subject ? ' on' : '');
+        });
+      };
+      chips.appendChild(c);
+    });
+    wrap.appendChild(chips);
+
+    function field(label, placeholder, tag) {
+      wrap.appendChild(el('div', 'kicker', label));
+      var input = el(tag || 'input', 'type-answer');
+      if (tag === 'textarea') input.rows = 3;
+      input.placeholder = placeholder;
+      input.style.marginBottom = '14px';
+      wrap.appendChild(input);
+      return input;
+    }
+
+    var qInput = field('the question', 'e.g. 4 + 5 × 3 = ?', 'textarea');
+    var aInput = field('your answer', 'what you wrote');
+    var cInput = field('the correct answer (optional)', 'leave blank for plain sums');
+
+    var error = el('div', 'muted small');
+    error.style.marginBottom = '10px';
+    wrap.appendChild(error);
+
+    wrap.appendChild(btn('btn btn--wide', 'Start reviewing', function () {
+      var prompt = qInput.value.trim(), given = aInput.value.trim(), answer = cInput.value.trim();
+      if (!prompt || !given) { error.textContent = 'Please fill in the question and your answer.'; return; }
+      if (!answer) {
+        answer = trySolve(prompt);
+        if (!answer) {
+          error.textContent = 'The Coach cannot work this one out by itself — please add the correct answer.';
+          return;
+        }
+      }
+      if (Coach.checkAnswer(given, { answer: answer, given: given }).ok) {
+        error.textContent = 'That answer looks correct, so there is nothing to review.';
+        return;
+      }
+      renderReview(root, {
+        id: 'own' + Date.now(), own: true,
+        subject: subject, subjectName: subject.charAt(0).toUpperCase() + subject.slice(1),
+        emoji: { math: '🔢', english: '📖', science: '🔬', chinese: '🀄' }[subject],
+        topic: 'own', topicName: 'Your question',
+        kicker: '', prompt: prompt, given: given, answer: answer, explanation: ''
+      }, onExit);
+    }));
+    root.appendChild(wrap);
+    window.scrollTo(0, 0);
+  }
+
+  /* ------------------------------ the two steps ------------------------------ */
+
+  function renderReview(root, mistake, onExit) {
+    var diagnosis = Coach.diagnose(mistake);
+    var step = 1;
+    var verdict = null;      // { ok, text } for the current step
+    var showHints = false;
+
+    function draw() {
+      root.innerHTML = '';
+
+      var top = el('div', 'lesson-top');
+      top.appendChild(btn('close-x', '✕', function () { renderList(root, onExit); }));
+      var track = el('div', 'track');
+      track.style.flex = '1';
+      var fill = el('i');
+      fill.style.width = (step === 1 ? 33 : step === 2 ? 66 : 100) + '%';
+      track.appendChild(fill);
+      top.appendChild(track);
+      top.appendChild(el('span', 'stat-pill dim', 'Step ' + Math.min(step, 2) + '/2'));
+      root.appendChild(top);
+
+      var body = el('div', 'lesson-body');
+      body.appendChild(el('div', 'kicker', mistake.subjectName + ' · ' + mistake.topicName));
+      if (mistake.passage) body.appendChild(el('div', 'passage', mistake.passage));
+      body.appendChild(el('h2', 'prompt', mistake.prompt));
+
+      var yours = el('div', 'your-answer');
+      yours.appendChild(el('span', 'your-label', 'You answered'));
+      yours.appendChild(el('span', 'your-value', mistake.given));
+      body.appendChild(yours);
+
+      if (step === 1) drawStepOne(body);
+      else if (step === 2) drawStepTwo(body);
+      else drawDone(body);
+
+      root.appendChild(body);
+    }
+
+    /* Step 1 — what do you think went wrong? */
+    function drawStepOne(body) {
+      body.appendChild(el('div', 'kicker', 'step 1 — what went wrong?'));
+      body.appendChild(el('p', 'muted small', 'In your own words, say what your mistake was. The Coach will tell you whether you have it right.'));
+
+      var input = el('textarea', 'type-answer');
+      input.rows = 3;
+      input.placeholder = 'e.g. I did the operations in the wrong order';
+      if (verdict) { input.value = verdict.text; input.disabled = true; }
+      body.appendChild(input);
+
+      if (showHints && !verdict) {
+        var hints = el('div', 'options');
+        hints.style.marginTop = '12px';
+        diagnosis.hints.forEach(function (h) {
+          var b = el('button', 'option');
+          b.type = 'button';
+          b.appendChild(el('span', null, h));
+          b.onclick = function () { input.value = h; sfx('select'); };
+          hints.appendChild(b);
+        });
+        body.appendChild(hints);
+      }
+
+      if (verdict) {
+        var banner = el('div', 'verdict-box ' + (verdict.ok ? 'ok' : 'no'));
+        banner.appendChild(el('strong', null, verdict.ok ? '✓ That is exactly it.' : verdict.unsure ? 'No problem — here is what happened.' : '✗ Not quite.'));
+        banner.appendChild(el('div', 'why', diagnosis.cause));
+        body.appendChild(banner);
+        body.appendChild(btn('btn btn--wide', 'Now write the answer', function () {
+          step = 2; verdict = null; draw();
+        }));
+        return;
+      }
+
+      var actions = el('div', 'play-actions');
+      actions.appendChild(btn('btn', 'Check my thinking', function () {
+        var result = Coach.matchDiagnosis(input.value, diagnosis);
+        if (result.empty) return;
+        verdict = { ok: result.ok, unsure: result.unsure, text: input.value };
+        sfx(result.ok ? 'correct' : 'wrong');
+        draw();
+      }));
+      actions.appendChild(btn('btn btn--ghost', showHints ? 'Hide hints' : 'I am not sure', function () {
+        showHints = !showHints;
+        draw();
+      }));
+      body.appendChild(actions);
+    }
+
+    /* Step 2 — write it correctly this time. */
+    function drawStepTwo(body) {
+      body.appendChild(el('div', 'kicker', 'step 2 — write the correct answer'));
+
+      var input = el('input', 'type-answer');
+      input.placeholder = 'Your corrected answer';
+      if (verdict) { input.value = verdict.text; input.disabled = true; }
+      body.appendChild(input);
+
+      if (verdict) {
+        var banner = el('div', 'verdict-box ' + (verdict.ok ? 'ok' : 'no'));
+        banner.appendChild(el('strong', null, verdict.ok
+          ? '✓ Correct' + (verdict.loose ? ' — ' + verdict.loose : '')
+          : verdict.repeated ? '✗ That is the same answer as before.' : '✗ Still not right.'));
+        if (!verdict.ok) banner.appendChild(el('div', 'why', 'The answer is "' + mistake.answer + '".'));
+        if (mistake.explanation) banner.appendChild(el('div', 'why', mistake.explanation));
+        body.appendChild(banner);
+
+        var actions = el('div', 'play-actions');
+        if (!verdict.ok) {
+          actions.appendChild(btn('btn btn--ghost', 'Try again', function () { verdict = null; draw(); }));
+        }
+        actions.appendChild(btn('btn', 'Done', function () {
+          if (!mistake.own) SH.Progress.removeMistake(mistake.id);
+          SH.Progress.addXp(8, 1);
+          sfx('complete');
+          step = 3;
+          draw();
+        }));
+        body.appendChild(actions);
+        return;
+      }
+
+      var check = btn('btn btn--wide', 'Check my answer', function () {
+        var result = Coach.checkAnswer(input.value, mistake);
+        if (result.empty) return;
+        verdict = { ok: result.ok, loose: result.loose, repeated: result.repeated, text: input.value };
+        sfx(result.ok ? 'correct' : 'wrong');
+        draw();
+      });
+      body.appendChild(check);
+      setTimeout(function () { input.focus(); }, 0);
+    }
+
+    function drawDone(body) {
+      var done = el('div', 'verdict-box ok');
+      done.appendChild(el('strong', null, '🎯 Reviewed  ·  +8 XP'));
+      done.appendChild(el('div', 'why', 'This question has been cleared from your list.'));
+      body.appendChild(done);
+
+      var actions = el('div', 'play-actions');
+      actions.appendChild(btn('btn', 'Next mistake', function () {
+        var remaining = SH.Progress.mistakes();
+        if (remaining.length) renderReview(root, remaining[0], onExit);
+        else renderList(root, onExit);
+      }));
+      actions.appendChild(btn('btn btn--ghost', 'Back to the list', function () { renderList(root, onExit); }));
+      body.appendChild(actions);
+    }
+
+    draw();
+    window.scrollTo(0, 0);
+  }
+
+  SH.startReview = function (root, opts) { renderList(root, opts.onExit); };
+  SH._trySolve = trySolve;
 })(window.StudyHub);
 </script>
 <script>
@@ -4647,6 +5472,7 @@ window.StudyHub = window.StudyHub || {};
     render();
   }
   SH.go = go;
+  SH.currentSubject = function () { return state.subjectId; };
 
   /* ---------------------------- HUD ---------------------------- */
   function renderHud() {
@@ -4661,6 +5487,11 @@ window.StudyHub = window.StudyHub || {};
     bar.appendChild(el('span', 'stat-pill fire', '🔥 ' + data.streak.current));
     bar.appendChild(el('span', 'stat-pill gem', '💎 ' + data.xp));
     bar.appendChild(el('span', 'stat-pill heart', '❤️ ' + data.hearts.n));
+    var pending = SH.Progress.mistakes().length;
+    var coachBtn = btn('icon-btn coach-btn', '🧑‍🏫', function () { openCoach(); });
+    coachBtn.title = pending ? pending + ' to review' : 'Coach';
+    if (pending) coachBtn.appendChild(el('span', 'badge', pending > 9 ? '9+' : String(pending)));
+    bar.appendChild(coachBtn);
     bar.appendChild(btn('icon-btn', '📊', function () { go('stats'); }));
     bar.appendChild(btn('icon-btn', '👤', function () { go('profile'); }));
     bar.appendChild(btn('icon-btn', SH.Sfx.muted() ? '🔇' : '🔊', function () {
@@ -4827,6 +5658,20 @@ window.StudyHub = window.StudyHub || {};
     card.appendChild(gb);
     wrap.appendChild(card);
 
+    var waiting = SH.Progress.mistakes().length;
+    if (waiting) {
+      var coachCard = el('button', 'play-card coach-card');
+      coachCard.type = 'button';
+      coachCard.appendChild(el('span', 'play-emoji', '🧑‍🏫'));
+      var cb = el('div', 'play-body');
+      cb.appendChild(el('div', 'play-title', waiting + (waiting === 1 ? ' mistake' : ' mistakes') + ' to go over'));
+      cb.appendChild(el('div', 'muted small', 'Work out what went wrong, then answer it again'));
+      coachCard.appendChild(cb);
+      coachCard.appendChild(el('span', 'play-go', '▶'));
+      coachCard.onclick = openCoach;
+      wrap.appendChild(coachCard);
+    }
+
     if (subject.id === 'chess') {
       var play = el('button', 'play-card');
       play.type = 'button';
@@ -4917,6 +5762,14 @@ window.StudyHub = window.StudyHub || {};
     });
 
     appEl.appendChild(wrap);
+  }
+
+  function openCoach() {
+    SH.Sfx.play('tap');
+    state.view = 'lesson';
+    renderHud();
+    appEl.innerHTML = '';
+    SH.startReview(appEl, { onExit: function () { go('path'); } });
   }
 
   function startLesson(subject, topic, lessonIndex, mode) {

@@ -21,6 +21,7 @@ window.StudyHub = window.StudyHub || {};
     topics: {},          // "subject/topic"   -> { asked, correct, sessions }
     totals: { asked: 0, correct: 0 },
     days: {},            // "YYYY-MM-DD" -> questions answered
+    mistakes: [],        // wrong answers kept for the Coach to review
     goal: 30,            // daily XP goal
     streak: { current: 0, best: 0, last: null }
   };
@@ -143,6 +144,32 @@ window.StudyHub = window.StudyHub || {};
         if (d.streak.current > d.streak.best) d.streak.best = d.streak.current;
       }
 
+      return write(d);
+    },
+
+    /* ---- the mistake log the Coach reviews ---- */
+    MAX_MISTAKES: 60,
+    logMistake: function (record) {
+      var d = Progress.all();
+      record.id = 'm' + Date.now() + Math.floor(Math.random() * 1000);
+      record.ts = Date.now();
+      // the same slip twice is one entry, refreshed
+      d.mistakes = d.mistakes.filter(function (x) {
+        return !(x.prompt === record.prompt && x.given === record.given);
+      });
+      d.mistakes.unshift(record);
+      if (d.mistakes.length > Progress.MAX_MISTAKES) d.mistakes.length = Progress.MAX_MISTAKES;
+      return write(d);
+    },
+    mistakes: function () { return Progress.all().mistakes; },
+    removeMistake: function (id) {
+      var d = Progress.all();
+      d.mistakes = d.mistakes.filter(function (x) { return x.id !== id; });
+      return write(d);
+    },
+    clearMistakes: function () {
+      var d = Progress.all();
+      d.mistakes = [];
       return write(d);
     },
 

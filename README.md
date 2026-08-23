@@ -2,7 +2,8 @@
 
 A study app for **English, Math, Science, Chinese and Chess**, built as a lesson path
 with hearts, XP, streaks and sound. It asks your age first, then serves the syllabus
-that matches your school year.
+that matches your school year. You can also play chess against a bot, and have the
+Coach walk you back through anything you got wrong.
 
 Open `index.html` in a browser. No build step, no dependencies, no network calls —
 it runs straight from the filesystem and stores progress in `localStorage`.
@@ -38,6 +39,53 @@ is remembered.
 Progress is stored per syllabus stage, so changing your age gives you a fresh path
 rather than a row of crowns you never earned. Change back and the old path returns;
 XP and streak are yours either way.
+
+## Playing chess
+
+The Chess course has a **Play against the bot** card at the top. Choose a strength from
+≈400 to ≈2000 and a colour, then tap a piece and tap where it should go. Legal moves,
+the last move, check and the material balance are all shown, with the move list in
+algebraic notation. Promotion, castling, en passant, undo and resign all work, and
+every drawing rule is reported properly — stalemate, threefold repetition, the
+fifty-move rule and insufficient material.
+
+Those ratings are a rough guide for picking an opponent, not calibrated Elo. A weak
+level is not merely a shallow search: it also has a blunder chance and picks freely
+among moves close to the best, because a shallow engine still never hangs a queen and
+plays nothing like a beginner. It will not, however, blunder away an obvious free
+capture.
+
+Every level answers within about two seconds. The search uses iterative deepening with
+a wall-clock deadline, so it goes as deep as the time allows and no deeper.
+
+## The Coach
+
+Get a question wrong in any subject except Chess and it goes into your mistake log —
+the 🧑‍🏫 button in the header. Reviewing one runs in two steps:
+
+1. **What went wrong?** You write, in your own words, what your mistake was. The Coach
+   tells you whether you have it right, and corrects you if not.
+2. **Write the answer again.** You type the corrected answer, and it checks that too.
+
+You can also add a question yourself: paste the question and the answer you gave. Give
+the correct answer as well, or leave it blank for a plain sum and the Coach will work
+it out.
+
+The Coach is deterministic analysis, not a language model — no network, no API key. It
+can be specific because it already knows the question, your answer, the right answer
+and the reasoning, so it compares them and recognises the classic error patterns:
+
+| You answered | It tells you |
+|---|---|
+| `27` to `4 + 5 × 3` | you worked left to right; × comes first |
+| `60 cm²` for a triangle with base 10, height 6 | exactly double — you forgot to halve |
+| `26 cm²` for the area of an 8×5 rectangle | that is the perimeter formula |
+| `4` to `(−15) + 11` | right size, wrong sign |
+| `2/5` to `1/2 + 1/3` | you added the tops and bottoms separately |
+| `2000` to `25% of 80` | out by 100 — 25% means 0.25 |
+| `fāxiǎn` for 发现 | right syllables, wrong tone — syllable 2 is tone 4 |
+| `电脑` for "television" | you picked a word sharing the character 电 |
+| `necesary` | you wrote one "s" where the word has two |
 
 ## The syllabus, by age
 
@@ -84,6 +132,11 @@ build.py              inlines everything into a single studyhub.html
 css/styles.css        design tokens, components, light + dark themes, the board
 js/storage.js         profile, XP, hearts, streak, lesson progress, shared helpers
 js/audio.js           synthesised sound effects
+js/chess-engine.js    full chess rules, shared by the game and the tests
+js/chess-ai.js        the opponent: search, evaluation, strength levels
+js/play.js            the chess game screen
+js/coach.js           works out what specifically went wrong in an answer
+js/review.js          the Coach's two-step review screens
 js/app.js             onboarding, HUD, learning path, stats, settings
 js/lesson.js          the lesson runner, board rendering and flashcards
 js/subjects/*.js      one module per subject, each registering its topics
@@ -93,14 +146,22 @@ tools/                checks you can run yourself (below)
 ## Checks
 
 ```
+node tools/perft.mjs           # chess move generation, against published counts
 node tools/verify-chess.mjs    # every puzzle, against real chess rules
+node tools/test-ai.mjs         # the opponent finds mates and beats weaker levels
 node tools/audit-levels.mjs    # every question, against the learner's age
 ```
 
-`verify-chess.mjs` generates the legal moves from each position and asserts that the
-intended answer really is mate, that no distractor is also mate, and that the solution
-is unique. It has already caught one position where the white king blocked its own
-queen's path.
+`perft.mjs` counts leaf nodes from the six standard test positions and compares them
+against published values — 4,085,603 nodes at depth 4 on Kiwipete, and so on. A single
+mistake anywhere in castling, en passant, promotion or pinned pieces changes the count,
+so a clean run means move generation is exact.
+
+`verify-chess.mjs` uses that same engine to check the puzzles in the course: the
+answer really is mate, no distractor is also mate, the solution is unique, and the
+notation shown matches what the engine calls the move. It has caught two real errors
+so far — a position where the white king blocked its own queen's path, and a move
+labelled "Rh1+" that was not actually check.
 
 `audit-levels.mjs` extracts every banked question's difficulty band from the source,
 runs each generator 60 times per stage, and fails if a question ever reaches a learner

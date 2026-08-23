@@ -484,3 +484,39 @@ button { font-family: inherit; }
 .promo-btn .piece { font-size: 1.8rem; color: #1a1a1a; }
 .promo-btn .piece.w { color: #fff; text-shadow: 0 1px 0 #2b2b2b, 0 -1px 0 #2b2b2b, 1px 0 0 #2b2b2b, -1px 0 0 #2b2b2b; }
 .promo-name { font-size: .68rem; font-weight: 800; color: var(--text-dim); text-transform: uppercase; }
+
+/* ---------------- the coach ---------------- */
+.coach-btn { position: relative; }
+.coach-btn .badge {
+  position: absolute; top: 0; right: 0;
+  background: var(--red); color: #fff;
+  font-size: .58rem; font-weight: 800; line-height: 1;
+  padding: 3px 5px; border-radius: 999px;
+}
+.coach-card { border-color: var(--blue); }
+.coach-card .play-go { color: var(--blue); }
+
+.mistake-row { cursor: pointer; text-align: left; font: inherit; }
+.mistake-row:hover { background: var(--sunk); }
+.mistake-row .row-title {
+  display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical;
+  overflow: hidden; font-size: .92rem;
+}
+
+.your-answer {
+  display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+  background: var(--red-tint); color: var(--red-dark);
+  border-radius: 12px; padding: 10px 14px; margin-bottom: 20px;
+}
+.your-label { font-size: .68rem; font-weight: 800; letter-spacing: .1em; text-transform: uppercase; opacity: .8; }
+.your-value { font-weight: 800; font-size: 1.05rem; }
+
+.verdict-box {
+  border-radius: 12px; padding: 14px 16px; margin: 16px 0;
+  font-weight: 800; line-height: 1.5;
+}
+.verdict-box.ok { background: var(--green-tint); color: var(--green-dark); }
+.verdict-box.no { background: var(--red-tint); color: var(--red-dark); }
+.verdict-box .why { font-weight: 700; font-size: .9rem; margin-top: 6px; color: var(--text); opacity: .9; }
+
+textarea.type-answer { resize: vertical; line-height: 1.5; }

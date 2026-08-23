@@ -127,12 +127,23 @@
   }
 
   /* Search captures only, so we never stop counting in the middle of a trade. */
+  function outOfTime(budget) {
+    if (budget.stop) return true;
+    if (budget.nodes > budget.max) { budget.stop = true; return true; }
+    // checking the clock is not free, so only do it every so often
+    if ((budget.nodes & 2047) === 0 && budget.deadline && Date.now() > budget.deadline) {
+      budget.stop = true;
+      return true;
+    }
+    return false;
+  }
+
   function quiesce(state, alpha, beta, budget) {
     budget.nodes++;
     var stand = evaluate(state);
     if (stand >= beta) return beta;
     if (stand > alpha) alpha = stand;
-    if (budget.nodes > budget.max) return alpha;
+    if (outOfTime(budget)) return alpha;
 
     var captures = ordered(Chess.legalCaptures(state));
     for (var i = 0; i < captures.length; i++) {
@@ -147,7 +158,7 @@
 
   function negamax(state, depth, alpha, beta, ply, budget) {
     budget.nodes++;
-    if (budget.nodes > budget.max) return evaluate(state);
+    if (outOfTime(budget)) return evaluate(state);
 
     var moves = Chess.legalMoves(state);
     if (moves.length === 0) {
@@ -167,32 +178,61 @@
     return alpha;
   }
 
-  /* Score every legal move at the given depth. */
-  function rankMoves(state, depth, maxNodes) {
-    var budget = { nodes: 0, max: maxNodes || 400000 };
+  /* How far below the best a root move may score and still be scored exactly.
+     It must exceed the widest "noise" window any level uses. */
+  var ROOT_WINDOW = 200;
+
+  /* Search the root with iterative deepening.
+
+     Two things keep this fast enough to play in a browser without freezing it:
+     the alpha bound is carried from one root move to the next instead of every
+     move starting from scratch, and each deeper iteration reorders the moves by
+     the previous iteration's scores. A wall-clock deadline stops the search
+     wherever it is, and the last completed depth is the one that gets used. */
+  function rankMoves(state, depth, maxNodes, timeMs) {
+    var budget = { nodes: 0, max: maxNodes || 400000, deadline: timeMs ? Date.now() + timeMs : 0, stop: false };
     var moves = ordered(Chess.legalMoves(state));
-    var scored = [];
-    for (var i = 0; i < moves.length; i++) {
-      var undo = Chess.make(state, moves[i]);
-      var score = -negamax(state, depth - 1, -MATE, MATE, 1, budget);
-      Chess.unmake(state, moves[i], undo);
-      scored.push({ move: moves[i], score: score });
+    var result = moves.map(function (m) { return { move: m, score: 0 }; });
+    if (moves.length <= 1) return { moves: result, nodes: 0, depth: 0 };
+
+    var reached = 0;
+    for (var d = 1; d <= depth; d++) {
+      var scored = [], alpha = -MATE, aborted = false;
+
+      for (var i = 0; i < moves.length; i++) {
+        var undo = Chess.make(state, moves[i]);
+        // moves far below the best cannot matter, so search those in a narrow window
+        var lower = i === 0 ? -MATE : alpha - ROOT_WINDOW;
+        var score = -negamax(state, d - 1, -MATE, -lower, 1, budget);
+        Chess.unmake(state, moves[i], undo);
+        if (budget.stop) { aborted = true; break; }
+        scored.push({ move: moves[i], score: score });
+        if (score > alpha) alpha = score;
+      }
+
+      if (aborted) break;
+      scored.sort(function (a, b) { return b.score - a.score; });
+      result = scored;
+      reached = d;
+      moves = scored.map(function (x) { return x.move; });      // best-first next time
+      if (Math.abs(result[0].score) > MATE - 1000) break;       // mate found, stop early
+      if (budget.deadline && Date.now() > budget.deadline) break;
     }
-    scored.sort(function (a, b) { return b.score - a.score; });
-    return { moves: scored, nodes: budget.nodes };
+
+    return { moves: result, nodes: budget.nodes, depth: reached };
   }
 
   var LEVELS = [
     { elo: 400,  name: 'Beginner',     blurb: 'Misses simple threats and gives pieces away',
-      depth: 1, blunder: 0.45, noise: 150, nodes: 30000 },
+      depth: 1, blunder: 0.45, noise: 150, nodes: 40000,   timeMs: 120 },
     { elo: 800,  name: 'Casual',       blurb: 'Takes free material, overlooks tactics',
-      depth: 2, blunder: 0.22, noise: 90,  nodes: 80000 },
+      depth: 2, blunder: 0.22, noise: 90,  nodes: 120000,  timeMs: 250 },
     { elo: 1200, name: 'Club player',  blurb: 'Punishes hanging pieces and one-move threats',
-      depth: 3, blunder: 0.08, noise: 45,  nodes: 200000 },
+      depth: 4, blunder: 0.08, noise: 45,  nodes: 400000,  timeMs: 600 },
     { elo: 1600, name: 'Strong',       blurb: 'Sees short tactics and defends accurately',
-      depth: 4, blunder: 0.02, noise: 18,  nodes: 400000 },
-    { elo: 2000, name: 'Expert',       blurb: 'Deep search, no deliberate mistakes',
-      depth: 5, blunder: 0,    noise: 0,   nodes: 900000 }
+      depth: 6, blunder: 0.02, noise: 18,  nodes: 1200000, timeMs: 1200 },
+    { elo: 2000, name: 'Expert',       blurb: 'Searches as deep as the time allows',
+      depth: 8, blunder: 0,    noise: 0,   nodes: 3000000, timeMs: 2000 }
   ];
 
   function levelFor(elo) {
@@ -214,7 +254,7 @@
       return { move: pool[Math.floor(Math.random() * pool.length)], level: level, blundered: true };
     }
 
-    var ranked = rankMoves(state, level.depth, level.nodes);
+    var ranked = rankMoves(state, level.depth, level.nodes, level.timeMs);
     var best = ranked.moves[0];
 
     // among moves close to the best, choose freely — this is what makes a
@@ -223,7 +263,8 @@
     var candidates = ranked.moves.filter(function (m) { return best.score - m.score <= window; });
     var pick = candidates[Math.floor(Math.random() * candidates.length)] || best;
 
-    return { move: pick.move, score: pick.score, best: best.score, level: level, nodes: ranked.nodes };
+    return { move: pick.move, score: pick.score, best: best.score, level: level,
+             nodes: ranked.nodes, depth: ranked.depth };
   }
 
   return {

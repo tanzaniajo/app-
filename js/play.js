@@ -109,7 +109,7 @@
 
   function startGame(root, elo, playerColor, onExit) {
     var game = {
-      state: Chess.create(),
+      state: Chess.createGame(),
       elo: elo,
       level: AI.levelFor(elo),
       player: playerColor,
@@ -411,7 +411,7 @@
       move: function (from, to) { playerMove(Chess.nameToSq(from), Chess.nameToSq(to)); },
       select: function (name) { selectSquare(Chess.nameToSq(name)); },
       load: function (fen) {
-        game.state = Chess.fromFen(fen);
+        game.state = Chess.createGame(fen);
         game.history = [];
         game.lastMove = null;
         game.selected = -1;

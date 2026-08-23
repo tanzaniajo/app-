@@ -130,8 +130,23 @@
         this.hearts = SH.Progress.loseHeart();
         sfx('heart');
       }
+      this.recordMistake(q, right);
     }
     this.draw();
+  };
+
+  /* Wrong answers are kept so the Coach can walk you back through them.
+     Chess is left out: its questions are positions, not written answers. */
+  Lesson.prototype.recordMistake = function (q, wasRight) {
+    if (wasRight || this.subject.id === 'chess') return;
+    var entry = this.log[this.log.length - 1];
+    if (!entry) return;
+    SH.Progress.logMistake({
+      subject: this.subject.id, subjectName: this.subject.name, emoji: this.subject.emoji,
+      topic: this.topic.id, topicName: this.topic.name,
+      kicker: q.kicker || '', prompt: q.prompt, passage: q.passage || '',
+      given: entry.given, answer: entry.answer, explanation: q.explanation || ''
+    });
   };
 
   Lesson.prototype.advance = function () {

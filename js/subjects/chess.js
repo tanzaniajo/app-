@@ -185,7 +185,7 @@
 
     { fen: '7k/8/7K/8/8/8/8/R7 w - - 0 1', band: 2,
       ask: 'White to play. Find checkmate in one move.',
-      moves: [['Ra8#', 'a1a8'], ['Ra7', 'a1a7'], ['Rh1+', 'a1h1'], ['Kg6', 'h6g6']],
+      moves: [['Ra8#', 'a1a8'], ['Ra7', 'a1a7'], ['Rh1', 'a1h1'], ['Kg6', 'h6g6']],
       why: 'The rook takes the eighth rank while the white king covers g7 and h7. This is the basic king-and-rook mate.' },
 
     { fen: 'r1bqkb1r/pppp1ppp/2n2n2/4p2Q/2B1P3/8/PPPP1PPP/RNB1K1NR w KQkq - 4 4', band: 2,

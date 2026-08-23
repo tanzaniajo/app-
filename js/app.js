@@ -211,6 +211,25 @@
     card.appendChild(gb);
     wrap.appendChild(card);
 
+    if (subject.id === 'chess') {
+      var play = el('button', 'play-card');
+      play.type = 'button';
+      play.appendChild(el('span', 'play-emoji', '♟️'));
+      var pb = el('div', 'play-body');
+      pb.appendChild(el('div', 'play-title', 'Play against the bot'));
+      pb.appendChild(el('div', 'muted small', 'Pick an opponent from beginner to expert, then play a full game'));
+      play.appendChild(pb);
+      play.appendChild(el('span', 'play-go', '▶'));
+      play.onclick = function () {
+        SH.Sfx.play('tap');
+        state.view = 'lesson';
+        renderHud();
+        appEl.innerHTML = '';
+        SH.startPlay(appEl, { onExit: function () { go('path'); } });
+      };
+      wrap.appendChild(play);
+    }
+
     var head = el('div', 'section-head');
     var h = el('div');
     h.appendChild(el('h2', null, subject.name + (subject.native ? ' ' + subject.native : '')));

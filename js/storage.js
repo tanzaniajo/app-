@@ -146,6 +146,21 @@ window.StudyHub = window.StudyHub || {};
       return write(d);
     },
 
+    /* XP earned outside a lesson — playing a game of chess, for instance.
+       It counts toward the daily goal and the streak, like any other activity. */
+    addXp: function (xp, activity) {
+      var d = Progress.all();
+      d.xp += xp;
+      var day = today();
+      d.days[day] = (d.days[day] || 0) + (activity == null ? 1 : activity);
+      if (d.streak.last !== day) {
+        d.streak.current = (d.streak.last && dayDiff(d.streak.last, day) === 1) ? d.streak.current + 1 : 1;
+        d.streak.last = day;
+        if (d.streak.current > d.streak.best) d.streak.best = d.streak.current;
+      }
+      return write(d);
+    },
+
     /* ---- rollups for the stats page ---- */
     subject: function (subjectId) {
       var d = Progress.all(), out = { asked: 0, correct: 0, sessions: 0, crowns: 0 };

@@ -6,8 +6,9 @@
   var Chess = SH.Chess;
   var AI = SH.ChessAI;
 
-  var GLYPH = { k: '♚', q: '♛', r: '♜', b: '♝', n: '♞', p: '♟' };
+  var Pieces = SH.ChessPieces;
   var NAME = { k: 'king', q: 'queen', r: 'rook', b: 'bishop', n: 'knight', p: 'pawn' };
+  var ANIM_MS = 190;
   var PREF_KEY = 'studyhub.chess.elo';
 
   function el(tag, cls, text) {
@@ -122,7 +123,9 @@
       result: null,
       resultDetail: '',
       awarded: false,
-      promo: null           // { from, to, options } while the picker is open
+      promo: null,          // { from, to, options } while the picker is open
+      premove: null,        // { from, to } queued while the bot thinks
+      anim: null            // { from, to, rookFrom, rookTo } to animate on the next draw
     };
 
     function botColor() { return game.player === 'w' ? 'b' : 'w'; }
@@ -160,6 +163,12 @@
 
     function applyMove(move) {
       var text = Chess.san(game.state, move);
+      game.anim = { from: move.from, to: move.to };
+      if (move.castle) {
+        var white = Chess.colorOf(move.piece) === 'w';
+        game.anim.rookFrom = move.castle === 'K' ? (white ? 7 : 63) : (white ? 0 : 56);
+        game.anim.rookTo = move.castle === 'K' ? move.to - 1 : move.to + 1;
+      }
       var undo = Chess.make(game.state, move);
       game.history.push({ move: move, undo: undo, san: text });
       game.lastMove = { from: move.from, to: move.to };
@@ -174,15 +183,37 @@
       if (game.over) return;
       game.thinking = true;
       draw();
-      // let the browser paint "thinking" before the search blocks the thread
-      setTimeout(function () {
-        var choice = AI.chooseMove(game.state, game.elo);
+      /* The search yields between slices, so the board stays clickable and a
+         premove can be queued while the bot is still working. */
+      AI.chooseMoveAsync(game.state, game.elo, function (choice) {
+        if (game.over) return;
         game.thinking = false;
         if (!choice) { finishIfOver(); draw(); return; }
         applyMove(choice.move);
-        finishIfOver();
-        draw();
-      }, 40);
+        if (finishIfOver()) { draw(); return; }
+        draw();          // paint the bot's move, and animate it
+        runPremove();    // then release any premove, which draws again itself
+      });
+    }
+
+    /* A premove was queued while the bot was thinking. Play it if it is still
+       legal now that the position has changed, and quietly drop it if not. */
+    function runPremove() {
+      var queued = game.premove;
+      game.premove = null;
+      if (!queued || game.over) return;
+      var legal = Chess.legalMoves(game.state).filter(function (m) {
+        return m.from === queued.from && m.to === queued.to;
+      });
+      if (!legal.length) { sfx('tap'); return; }
+      if (legal.length > 1 && legal[0].promo) {   // a premoved promotion always queens
+        var queen = legal.filter(function (m) { return String(m.promo).toLowerCase() === 'q'; })[0];
+        applyMove(queen || legal[0]);
+      } else {
+        applyMove(legal[0]);
+      }
+      if (finishIfOver()) draw();
+      else botMove();
     }
 
     function playerMove(from, to) {
@@ -197,20 +228,51 @@
         return;
       }
       applyMove(legal[0]);
-      if (!finishIfOver()) botMove();
-      draw();
+      // botMove draws once it has flagged itself as thinking; drawing again here
+      // would rebuild the board underneath the animation we just scheduled
+      if (finishIfOver()) draw();
+      else botMove();
+    }
+
+    /* Where a piece could go if it were our turn. Used for premoves, so it
+       deliberately ignores whatever the opponent is about to do. */
+    function premoveTargets(sq) {
+      return Chess.pseudoMoves(game.state, game.player)
+        .filter(function (m) { return m.from === sq; })
+        .map(function (m) { return m.to; });
     }
 
     function selectSquare(sq) {
-      if (game.over || game.thinking || game.promo) return;
-      if (game.state.turn !== game.player) return;
-
+      if (game.over || game.promo) return;
       var piece = game.state.board[sq];
+      var mine = piece !== 0 && Chess.colorOf(piece) === game.player;
+
+      // the bot is thinking: anything we do here queues a premove
+      if (game.state.turn !== game.player) {
+        if (game.selected >= 0 && game.targets.indexOf(sq) !== -1) {
+          game.premove = { from: game.selected, to: sq };
+          game.selected = -1;
+          game.targets = [];
+          sfx('select');
+        } else if (mine) {
+          game.premove = null;
+          game.selected = sq;
+          game.targets = premoveTargets(sq);
+          sfx('tap');
+        } else {
+          game.selected = -1;
+          game.targets = [];
+          game.premove = null;
+        }
+        draw();
+        return;
+      }
+
       if (game.selected >= 0 && game.targets.indexOf(sq) !== -1) {
         playerMove(game.selected, sq);
         return;
       }
-      if (piece !== 0 && Chess.colorOf(piece) === game.player) {
+      if (mine) {
         game.selected = sq;
         game.targets = Chess.legalMoves(game.state)
           .filter(function (m) { return m.from === sq; })
@@ -238,6 +300,8 @@
       game.awarded = false;
       game.selected = -1;
       game.targets = [];
+      game.premove = null;
+      game.anim = null;
       var prev = game.history[game.history.length - 1];
       game.lastMove = prev ? { from: prev.move.from, to: prev.move.to } : null;
       sfx('tap');
@@ -270,6 +334,7 @@
 
     function drawBoard() {
       var wrap = el('div', 'board-wrap');
+      var cells = {};
       var grid = el('div', 'board board--play');
       var flipped = game.player === 'b';
       var kingInCheck = Chess.inCheck(game.state, game.state.turn)
@@ -286,6 +351,7 @@
           cell.setAttribute('aria-label', Chess.sqName(sq));
 
           if (game.lastMove && (sq === game.lastMove.from || sq === game.lastMove.to)) cell.classList.add('last');
+          if (game.premove && (sq === game.premove.from || sq === game.premove.to)) cell.classList.add('premove');
           if (sq === game.selected) cell.classList.add('sel');
           if (sq === kingInCheck) cell.classList.add('check');
 
@@ -293,26 +359,59 @@
           if (piece !== 0) {
             var white = Chess.isWhitePiece(piece);
             var kind = piece.toLowerCase();
-            var span = el('span', 'piece ' + (white ? 'w' : 'b'), GLYPH[kind]);
+            var span = el('span', 'piece');
+            span.innerHTML = Pieces.svg(piece);
             span.setAttribute('role', 'img');
             span.setAttribute('aria-label', (white ? 'white ' : 'black ') + NAME[kind]);
+            span.dataset.sq = sq;
             cell.appendChild(span);
           }
           if (game.targets.indexOf(sq) !== -1) {
             cell.appendChild(el('span', piece !== 0 ? 'target take' : 'target'));
           }
+          if (col === 0) cell.appendChild(el('span', 'coord rank', String(rank + 1)));
+          if (row === 7) cell.appendChild(el('span', 'coord file', 'abcdefgh'.charAt(file)));
 
+          cells[sq] = cell;
           (function (square) { cell.onclick = function () { selectSquare(square); }; })(sq);
           grid.appendChild(cell);
         }
       }
       wrap.appendChild(grid);
 
-      var coords = el('div', 'board-files');
-      var letters = flipped ? 'hgfedcba' : 'abcdefgh';
-      letters.split('').forEach(function (f) { coords.appendChild(el('span', null, f)); });
-      wrap.appendChild(coords);
+      /* Slide the piece that just moved. The board has already been rebuilt in its
+         new state, so the piece is placed at its destination, shifted back to where
+         it came from, and then released — the browser animates the difference. */
+      if (game.anim) {
+        var anim = game.anim;
+        game.anim = null;
+        requestAnimationFrame(function () {
+          slide(cells[anim.from], cells[anim.to]);
+          if (anim.rookFrom != null) slide(cells[anim.rookFrom], cells[anim.rookTo]);
+        });
+      }
       return wrap;
+    }
+
+    function slide(fromCell, toCell) {
+      if (!fromCell || !toCell) return;
+      var piece = toCell.querySelector('.piece');
+      if (!piece) return;
+      var a = fromCell.getBoundingClientRect(), b = toCell.getBoundingClientRect();
+      var dx = a.left - b.left, dy = a.top - b.top;
+      if (!dx && !dy) return;
+      piece.classList.add('moving');
+      piece.style.transition = 'none';
+      piece.style.transform = 'translate(' + dx + 'px,' + dy + 'px)';
+      // force the browser to accept the offset before transitioning away from it
+      void piece.offsetWidth;
+      piece.style.transition = 'transform ' + ANIM_MS + 'ms cubic-bezier(.2,.7,.3,1)';
+      piece.style.transform = 'translate(0,0)';
+      setTimeout(function () {
+        piece.classList.remove('moving');
+        piece.style.transition = '';
+        piece.style.transform = '';
+      }, ANIM_MS + 30);
     }
 
     function drawMoveList() {
@@ -331,7 +430,7 @@
 
     function statusLine() {
       if (game.over) return game.resultDetail;
-      if (game.thinking) return 'The bot is thinking…';
+      if (game.thinking) return game.premove ? 'The bot is thinking… (premove ready)' : 'The bot is thinking — you can premove';
       if (Chess.inCheck(game.state, game.state.turn)) {
         return game.state.turn === game.player ? 'You are in check!' : 'The bot is in check';
       }
@@ -358,6 +457,13 @@
       status.appendChild(el('strong', null, statusLine()));
       if (game.over && game.xpEarned) status.appendChild(el('span', 'muted', '  +' + game.xpEarned + ' XP'));
       body.appendChild(status);
+
+      if (game.premove && !game.over) {
+        var note = el('div', 'premove-note');
+        note.appendChild(el('span', null, 'Premove: ' + Chess.sqName(game.premove.from) + ' → ' + Chess.sqName(game.premove.to)));
+        note.appendChild(btn('link', 'Cancel', function () { game.premove = null; sfx('tap'); draw(); }));
+        body.appendChild(note);
+      }
 
       if (game.over) {
         var again = el('div', 'play-actions');
@@ -388,14 +494,16 @@
         var kind = String(m.promo).toLowerCase();
         var b = el('button', 'promo-btn');
         b.type = 'button';
-        b.appendChild(el('span', 'piece ' + (game.player === 'w' ? 'w' : 'b'), GLYPH[kind]));
+        var art = el('span', 'piece');
+        art.innerHTML = Pieces.svg(game.player === 'w' ? kind.toUpperCase() : kind);
+        b.appendChild(art);
         b.appendChild(el('span', 'promo-name', NAME[kind]));
         b.onclick = function () {
           game.promo = null;
           document.body.removeChild(back);
           applyMove(m);
-          if (!finishIfOver()) botMove();
-          draw();
+          if (finishIfOver()) draw();
+          else botMove();
         };
         row.appendChild(b);
       });

@@ -49,6 +49,17 @@ algebraic notation. Promotion, castling, en passant, undo and resign all work, a
 every drawing rule is reported properly — stalemate, threefold repetition, the
 fifty-move rule and insufficient material.
 
+**Premoves.** While the bot is thinking you can already play your reply: tap a piece
+and a square and it is queued, shown in blue with a Cancel next to it. It is played
+the instant the bot moves, or quietly dropped if the bot's move made it illegal. For
+that to work the search must not freeze the page, so it runs in short slices and hands
+control back to the browser between them.
+
+**Animation.** Pieces slide to their new square rather than teleporting, castling moves
+the rook alongside the king, and the board is drawn with its own set of pieces — SVG
+rather than Unicode chess glyphs, which are drawn by whatever font the device happens
+to have and vary from hairline outlines to solid blocks.
+
 Those ratings are a rough guide for picking an opponent, not calibrated Elo. A weak
 level is not merely a shallow search: it also has a blunder chance and picks freely
 among moves close to the best, because a shallow engine still never hangs a queen and
@@ -132,6 +143,7 @@ build.py              inlines everything into a single studyhub.html
 css/styles.css        design tokens, components, light + dark themes, the board
 js/storage.js         profile, XP, hearts, streak, lesson progress, shared helpers
 js/audio.js           synthesised sound effects
+js/chess-pieces.js    the piece artwork, drawn as SVG
 js/chess-engine.js    full chess rules, shared by the game and the tests
 js/chess-ai.js        the opponent: search, evaluation, strength levels
 js/play.js            the chess game screen

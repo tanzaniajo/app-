@@ -419,21 +419,30 @@ button { font-family: inherit; }
   box-shadow: 0 3px 0 rgba(0,0,0,.25);
 }
 .board .sq {
+  position: relative;
   aspect-ratio: 1 / 1; display: grid; place-items: center;
-  font-size: clamp(19px, 5.8vw, 31px); line-height: 1;
+  line-height: 1;
 }
-.board .sq.light { background: #f0d9b5; }
-.board .sq.dark  { background: #b58863; }
-.board .piece.w {
-  color: #fff;
-  text-shadow: 0 1px 0 #2b2b2b, 0 -1px 0 #2b2b2b, 1px 0 0 #2b2b2b, -1px 0 0 #2b2b2b;
+.board .sq.light { background: #eeeed2; }
+.board .sq.dark  { background: #769656; }
+.board .piece {
+  width: 88%; height: 88%;
+  display: block; pointer-events: none;
+  /* the piece is lifted into its own layer so moves animate smoothly */
+  will-change: transform;
 }
-.board .piece.b { color: #1a1a1a; text-shadow: 0 0 2px rgba(255,255,255,.30); }
-.board-files {
-  display: grid; grid-template-columns: repeat(8, 1fr);
-  font-size: .68rem; font-weight: 800; color: var(--text-dim);
-  text-align: center; padding-top: 4px;
+.board .piece svg { width: 100%; height: 100%; display: block; }
+.board .piece.moving { z-index: 6; }
+
+/* coordinates in the corner of the edge squares */
+.board .coord {
+  position: absolute; font-size: .62rem; font-weight: 800; line-height: 1;
+  pointer-events: none; user-select: none;
 }
+.board .coord.rank { top: 3px; left: 3px; }
+.board .coord.file { bottom: 3px; right: 4px; }
+.board .sq.light .coord { color: #769656; }
+.board .sq.dark  .coord { color: #eeeed2; }
 
 /* ---------------- playing a game ---------------- */
 .play-card {
@@ -452,19 +461,29 @@ button { font-family: inherit; }
   position: relative; border: 0; padding: 0; cursor: pointer;
   font-family: inherit;
 }
-.board--play .sq.last { box-shadow: inset 0 0 0 100px rgba(255, 200, 0, .28); }
-.board--play .sq.sel  { box-shadow: inset 0 0 0 100px rgba(28, 176, 246, .38); }
-.board--play .sq.check { box-shadow: inset 0 0 0 100px rgba(255, 75, 75, .45); }
-.board--play .piece { position: relative; z-index: 2; pointer-events: none; }
+.board--play .sq.last { box-shadow: inset 0 0 0 100px rgba(255, 232, 92, .55); }
+.board--play .sq.sel  { box-shadow: inset 0 0 0 100px rgba(255, 232, 92, .72); }
+.board--play .sq.check {
+  background-image: radial-gradient(circle at 50% 50%, rgba(255,60,60,.95) 12%, rgba(255,60,60,.55) 46%, rgba(255,60,60,0) 72%);
+}
+.board--play .sq.premove { box-shadow: inset 0 0 0 100px rgba(101, 173, 255, .62); }
+.board--play .piece { position: relative; z-index: 2; }
 .target {
   position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%);
   width: 30%; height: 30%; border-radius: 50%;
-  background: rgba(20, 20, 20, .32); z-index: 1; pointer-events: none;
+  background: rgba(20, 20, 20, .26); z-index: 1; pointer-events: none;
 }
 .target.take {
-  width: 84%; height: 84%; background: transparent;
-  border: 4px solid rgba(20, 20, 20, .32); border-radius: 50%;
+  width: 92%; height: 92%; background: transparent;
+  border: 6px solid rgba(20, 20, 20, .22); border-radius: 50%;
 }
+.premove-note {
+  display: flex; align-items: center; justify-content: space-between; gap: 10px;
+  background: rgba(101, 173, 255, .16); color: var(--blue-dark);
+  border-radius: 10px; padding: 8px 12px; margin-top: 10px;
+  font-size: .82rem; font-weight: 800;
+}
+html[data-theme="dark"] .premove-note { color: #9dd0ff; }
 
 .play-status {
   margin: 16px 0 12px; padding: 12px 14px; border-radius: 12px;
@@ -489,8 +508,8 @@ button { font-family: inherit; }
   display: flex; flex-direction: column; align-items: center; gap: 4px; font: inherit;
 }
 .promo-btn:hover { background: var(--sunk); }
-.promo-btn .piece { font-size: 1.8rem; color: #1a1a1a; }
-.promo-btn .piece.w { color: #fff; text-shadow: 0 1px 0 #2b2b2b, 0 -1px 0 #2b2b2b, 1px 0 0 #2b2b2b, -1px 0 0 #2b2b2b; }
+.promo-btn .piece { width: 42px; height: 42px; display: block; }
+.promo-btn .piece svg { width: 100%; height: 100%; display: block; }
 .promo-name { font-size: .68rem; font-weight: 800; color: var(--text-dim); text-transform: uppercase; }
 
 /* ---------------- the coach ---------------- */
@@ -1004,6 +1023,91 @@ window.StudyHub = window.StudyHub || {};
     }
   };
 })(window.StudyHub);
+</script>
+<script>
+/* Chess piece artwork as inline SVG.
+
+   Unicode chess glyphs are drawn by whatever font the device happens to have,
+   so they vary from thin outlines to solid blocks and never match each other.
+   These are drawn here instead: one 45x45 viewBox per piece, filled and
+   outlined, so white and black are the same shapes in different colours. */
+(function (root, factory) {
+  var api = factory();
+  if (typeof module === 'object' && module.exports) module.exports = api;
+  if (root) { root.StudyHub = root.StudyHub || {}; root.StudyHub.ChessPieces = api; }
+})(typeof globalThis !== 'undefined' ? globalThis : this, function () {
+  'use strict';
+
+  /* Shared foot: every piece stands on the same two-tier base. */
+  var FOOT =
+    '<path d="M11.2 33.2h22.6c1 0 1.6.5 1.6 1.3v1.2c0 .8-.6 1.3-1.6 1.3H11.2c-1 0-1.6-.5-1.6-1.3v-1.2c0-.8.6-1.3 1.6-1.3z"/>' +
+    '<path d="M9 37.2h27c1.1 0 1.8.6 1.8 1.5v1.4c0 .9-.7 1.5-1.8 1.5H9c-1.1 0-1.8-.6-1.8-1.5v-1.4c0-.9.7-1.5 1.8-1.5z"/>';
+
+  var SHAPES = {
+    p:
+      '<circle cx="22.5" cy="13.6" r="5"/>' +
+      '<path d="M22.5 17.4c3.6 0 6 2.1 6 4.6 0 2-1.3 3.3-2.7 4.1 2.7 1.6 4.4 4 4.9 7.1H16.8c.5-3.1 2.2-5.5 4.9-7.1-1.4-.8-2.7-2.1-2.7-4.1 0-2.5 2.4-4.6 3.5-4.6z"/>' +
+      FOOT,
+
+    r:
+      '<path d="M12 8.5h4.4v3.1h4V8.5h4.2v3.1h4V8.5H33v9.2l-2.6 2.4H14.6L12 17.7z"/>' +
+      '<path d="M15.4 20.6h14.2l1.2 12.2H14.2z"/>' +
+      FOOT,
+
+    n:
+      '<path d="M28.2 9.1 29.4 4.4 33.2 8.6Z"/>' +
+      '<path d="M30.6 8.4c2.7.7 4.3 3.2 4.7 6.9.6 5.4.3 11.8 0 18.1H13.4c-.3-4.9 1.3-8.8 4.8-11.6' +
+      '-1.8.9-3.8 1.8-5.7 2.3-1.9.5-3.2-.8-2.3-2.6 1.5-3 4.2-5.5 7.1-7.5 3-2.1 6.2-4 9-5.4' +
+      '1.4-.7 3-.8 4.3-.2z"/>' +
+      '<ellipse cx="25.2" cy="14.6" rx="1.35" ry="1.8" fill="#161616" stroke="none"/>' +
+      '<circle cx="12.6" cy="22.1" r="0.85" fill="#161616" stroke="none"/>' +
+      '<path d="M30.2 9.6c2 3.4 2.7 9.4 2.4 16.6" fill="none" stroke-width="1.2" opacity=".5"/>' +
+      FOOT,
+
+    b:
+      '<circle cx="22.5" cy="8.6" r="2.6"/>' +
+      '<path d="M22.5 10.8c4.7 0 8.4 5 8.4 10.1 0 3.7-2.4 6.2-5.2 7.3h-6.4c-2.8-1.1-5.2-3.6-5.2-7.3 0-5.1 3.7-10.1 8.4-10.1z"/>' +
+      '<path d="M16.2 28.6h12.6c1.1 0 1.8.6 1.8 1.5v1.2c0 .9-.7 1.5-1.8 1.5H16.2c-1.1 0-1.8-.6-1.8-1.5v-1.2c0-.9.7-1.5 1.8-1.5z"/>' +
+      '<path d="M22.5 15.4v7M19.4 18.5h6.2" fill="none" stroke-width="1.6"/>' +
+      FOOT,
+
+    q:
+      '<circle cx="7.6" cy="12.2" r="2.6"/><circle cx="15" cy="9" r="2.6"/>' +
+      '<circle cx="22.5" cy="7.8" r="2.9"/>' +
+      '<circle cx="30" cy="9" r="2.6"/><circle cx="37.4" cy="12.2" r="2.6"/>' +
+      '<path d="M8.8 14.6c1.6 4.4 2.8 8.4 3.4 12.2h20.6c.6-3.8 1.8-7.8 3.4-12.2' +
+      'l-5.9 4.6-2.7-8.6-3.1 9h-3.1l-3.1-9-2.7 8.6z"/>' +
+      '<path d="M12.4 28.2h20.2c.5 1.6.8 3.2.9 4.6H11.5c.1-1.4.4-3 .9-4.6z"/>' +
+      FOOT,
+
+    k:
+      '<path d="M22.5 4.4v8.2M18.9 7.8h7.2" fill="none" stroke-width="2.4" stroke-linecap="round"/>' +
+      '<path d="M22.5 13.6c1.6-2.4 4.2-3.6 6.9-3.1 3.5.7 5.4 4 4.6 7.6-.6 2.8-2.4 5.2-4.2 7.4H15.2' +
+      'c-1.8-2.2-3.6-4.6-4.2-7.4-.8-3.6 1.1-6.9 4.6-7.6 2.7-.5 5.3.7 6.9 3.1z"/>' +
+      '<path d="M14.6 25.5h15.8c.7 2.4 1.1 4.9 1.2 7.3H13.4c.1-2.4.5-4.9 1.2-7.3z"/>' +
+      FOOT
+  };
+
+  var COLOURS = {
+    w: { fill: '#f9f9f9', stroke: '#3f3f3f' },
+    b: { fill: '#3d3d3d', stroke: '#161616' }
+  };
+
+  /* `piece` is a FEN letter: uppercase = white. */
+  function svg(piece, size) {
+    var white = piece === piece.toUpperCase();
+    var kind = piece.toLowerCase();
+    var shape = SHAPES[kind];
+    if (!shape) return '';
+    var c = COLOURS[white ? 'w' : 'b'];
+    return '<svg viewBox="0 0 45 45" width="' + (size || '100%') + '" height="' + (size || '100%') +
+      '" class="cp cp-' + (white ? 'w' : 'b') + '" aria-hidden="true" focusable="false">' +
+      '<g fill="' + c.fill + '" stroke="' + c.stroke + '" stroke-width="1.5" ' +
+      'stroke-linejoin="round" stroke-linecap="round">' + shape + '</g></svg>';
+  }
+
+  return { svg: svg, SHAPES: SHAPES, COLOURS: COLOURS };
+});
 </script>
 <script>
 /* A complete chess rules engine: move generation, castling, en passant,
@@ -1710,6 +1814,96 @@ window.StudyHub = window.StudyHub || {};
     return { moves: result, nodes: budget.nodes, depth: reached };
   }
 
+  /* The same iterative deepening, but spread across event-loop turns.
+
+     A search that blocks the main thread for two seconds also blocks every click,
+     which makes premoving impossible — the whole point of premoving is to move
+     while the opponent is thinking. So this version works for a slice of a few
+     milliseconds, yields to the browser, and picks up where it left off.
+
+     It runs on a copy of the position, so the board the player is clicking on is
+     never mid-search. */
+  /* Yield to the browser without paying setTimeout's ~4ms clamp, which is a lot
+     of overhead when the search only works for 20ms at a time. */
+  var yieldSoon = (function () {
+    if (typeof MessageChannel === 'function') {
+      var channel = new MessageChannel();
+      var queue = [];
+      channel.port1.onmessage = function () {
+        var fn = queue.shift();
+        if (fn) fn();
+      };
+      return function (fn) { queue.push(fn); channel.port2.postMessage(0); };
+    }
+    return function (fn) { setTimeout(fn, 0); };
+  })();
+
+  var SLICE_MS = 12;
+
+  function chooseMoveAsync(realState, elo, onDone) {
+    var level = levelFor(elo);
+    var legal = Chess.legalMoves(realState);
+    if (!legal.length) return onDone(null);
+
+    function deliver(chosen) {
+      // the move was found on a copy, so look it up again on the real board
+      var uci = Chess.sqName(chosen.move.from) + Chess.sqName(chosen.move.to) +
+                (chosen.move.promo ? String(chosen.move.promo).toLowerCase() : '');
+      var real = Chess.findMove(realState, uci);
+      onDone(real ? { move: real, score: chosen.score, level: level, depth: chosen.depth } : null);
+    }
+
+    if (level.blunder > 0 && Math.random() < level.blunder) {
+      var quiet = legal.filter(function (m) { return !m.captured || VALUE[String(m.captured).toLowerCase()] < 300; });
+      var pool = quiet.length ? quiet : legal;
+      var pick = pool[Math.floor(Math.random() * pool.length)];
+      return setTimeout(function () { onDone({ move: pick, level: level, blundered: true }); }, 30);
+    }
+
+    var state = Chess.clone(realState);
+    var budget = { nodes: 0, max: level.nodes, deadline: Date.now() + level.timeMs, stop: false };
+    var moves = ordered(Chess.legalMoves(state));
+    var best = { move: moves[0], score: 0, depth: 0 };
+    var depth = 1, index = 0, alpha = -MATE, scored = [];
+
+    function slice() {
+      var until = Date.now() + SLICE_MS;      // hand the browser back control this often
+      while (index < moves.length && Date.now() < until) {
+        var m = moves[index];
+        var undo = Chess.make(state, m);
+        var lower = index === 0 ? -MATE : alpha - ROOT_WINDOW;
+        var score = -negamax(state, depth - 1, -MATE, -lower, 1, budget);
+        Chess.unmake(state, m, undo);
+        if (budget.stop) break;
+        scored.push({ move: m, score: score });
+        if (score > alpha) alpha = score;
+        index++;
+      }
+
+      var timeUp = budget.stop || Date.now() > budget.deadline;
+
+      if (index >= moves.length) {                      // finished this depth
+        scored.sort(function (a, b) { return b.score - a.score; });
+        var window = level.noise;
+        var top = scored.filter(function (x) { return scored[0].score - x.score <= window; });
+        var choice = top[Math.floor(Math.random() * top.length)] || scored[0];
+        best = { move: choice.move, score: choice.score, depth: depth };
+
+        var mateFound = Math.abs(scored[0].score) > MATE - 1000;
+        if (depth >= level.depth || timeUp || mateFound) return deliver(best);
+
+        moves = scored.map(function (x) { return x.move; });   // best-first next time
+        depth++; index = 0; alpha = -MATE; scored = [];
+      } else if (timeUp) {
+        return deliver(best);                            // keep the last full depth
+      }
+
+      yieldSoon(slice);
+    }
+
+    yieldSoon(slice);
+  }
+
   var LEVELS = [
     { elo: 400,  name: 'Beginner',     blurb: 'Misses simple threats and gives pieces away',
       depth: 1, blunder: 0.45, noise: 150, nodes: 40000,   timeMs: 120 },
@@ -1759,6 +1953,7 @@ window.StudyHub = window.StudyHub || {};
     evaluate: evaluate,
     rankMoves: rankMoves,
     chooseMove: chooseMove,
+    chooseMoveAsync: chooseMoveAsync,
     LEVELS: LEVELS,
     levelFor: levelFor,
     MATE: MATE,
@@ -4225,7 +4420,6 @@ window.StudyHub = window.StudyHub || {};
 
   /* Draw a position from a FEN string. Filled glyphs are used for both sides and
      coloured with CSS, because outline glyphs render inconsistently across fonts. */
-  var GLYPH = { k: '\u265A', q: '\u265B', r: '\u265C', b: '\u265D', n: '\u265E', p: '\u265F' };
   var PIECE_NAME = { k: 'king', q: 'queen', r: 'rook', b: 'bishop', n: 'knight', p: 'pawn' };
 
   function renderBoard(fen) {
@@ -4253,19 +4447,20 @@ window.StudyHub = window.StudyHub || {};
       if (piece) {
         var white = piece === piece.toUpperCase();
         var kind = piece.toLowerCase();
-        var span = el('span', 'piece ' + (white ? 'w' : 'b'), GLYPH[kind]);
+        var span = el('span', 'piece');
+        span.innerHTML = SH.ChessPieces.svg(piece);
         span.setAttribute('role', 'img');
         span.setAttribute('aria-label', (white ? 'white ' : 'black ') + PIECE_NAME[kind] +
           ' on ' + 'abcdefgh'.charAt(fileIndex) + (8 - rowIndex));
         cell.appendChild(span);
       }
+      // coordinates sit in the corner of the edge squares, as on a real board
+      if (fileIndex === 0) cell.appendChild(el('span', 'coord rank', String(8 - rowIndex)));
+      if (rowIndex === 7) cell.appendChild(el('span', 'coord file', 'abcdefgh'.charAt(fileIndex)));
       return cell;
     }
 
     wrap.appendChild(grid);
-    var coords = el('div', 'board-files');
-    'abcdefgh'.split('').forEach(function (f) { coords.appendChild(el('span', null, f)); });
-    wrap.appendChild(coords);
     return wrap;
   }
 
@@ -4650,8 +4845,9 @@ window.StudyHub = window.StudyHub || {};
   var Chess = SH.Chess;
   var AI = SH.ChessAI;
 
-  var GLYPH = { k: '♚', q: '♛', r: '♜', b: '♝', n: '♞', p: '♟' };
+  var Pieces = SH.ChessPieces;
   var NAME = { k: 'king', q: 'queen', r: 'rook', b: 'bishop', n: 'knight', p: 'pawn' };
+  var ANIM_MS = 190;
   var PREF_KEY = 'studyhub.chess.elo';
 
   function el(tag, cls, text) {
@@ -4766,7 +4962,9 @@ window.StudyHub = window.StudyHub || {};
       result: null,
       resultDetail: '',
       awarded: false,
-      promo: null           // { from, to, options } while the picker is open
+      promo: null,          // { from, to, options } while the picker is open
+      premove: null,        // { from, to } queued while the bot thinks
+      anim: null            // { from, to, rookFrom, rookTo } to animate on the next draw
     };
 
     function botColor() { return game.player === 'w' ? 'b' : 'w'; }
@@ -4804,6 +5002,12 @@ window.StudyHub = window.StudyHub || {};
 
     function applyMove(move) {
       var text = Chess.san(game.state, move);
+      game.anim = { from: move.from, to: move.to };
+      if (move.castle) {
+        var white = Chess.colorOf(move.piece) === 'w';
+        game.anim.rookFrom = move.castle === 'K' ? (white ? 7 : 63) : (white ? 0 : 56);
+        game.anim.rookTo = move.castle === 'K' ? move.to - 1 : move.to + 1;
+      }
       var undo = Chess.make(game.state, move);
       game.history.push({ move: move, undo: undo, san: text });
       game.lastMove = { from: move.from, to: move.to };
@@ -4818,15 +5022,37 @@ window.StudyHub = window.StudyHub || {};
       if (game.over) return;
       game.thinking = true;
       draw();
-      // let the browser paint "thinking" before the search blocks the thread
-      setTimeout(function () {
-        var choice = AI.chooseMove(game.state, game.elo);
+      /* The search yields between slices, so the board stays clickable and a
+         premove can be queued while the bot is still working. */
+      AI.chooseMoveAsync(game.state, game.elo, function (choice) {
+        if (game.over) return;
         game.thinking = false;
         if (!choice) { finishIfOver(); draw(); return; }
         applyMove(choice.move);
-        finishIfOver();
-        draw();
-      }, 40);
+        if (finishIfOver()) { draw(); return; }
+        draw();          // paint the bot's move, and animate it
+        runPremove();    // then release any premove, which draws again itself
+      });
+    }
+
+    /* A premove was queued while the bot was thinking. Play it if it is still
+       legal now that the position has changed, and quietly drop it if not. */
+    function runPremove() {
+      var queued = game.premove;
+      game.premove = null;
+      if (!queued || game.over) return;
+      var legal = Chess.legalMoves(game.state).filter(function (m) {
+        return m.from === queued.from && m.to === queued.to;
+      });
+      if (!legal.length) { sfx('tap'); return; }
+      if (legal.length > 1 && legal[0].promo) {   // a premoved promotion always queens
+        var queen = legal.filter(function (m) { return String(m.promo).toLowerCase() === 'q'; })[0];
+        applyMove(queen || legal[0]);
+      } else {
+        applyMove(legal[0]);
+      }
+      if (finishIfOver()) draw();
+      else botMove();
     }
 
     function playerMove(from, to) {
@@ -4841,20 +5067,51 @@ window.StudyHub = window.StudyHub || {};
         return;
       }
       applyMove(legal[0]);
-      if (!finishIfOver()) botMove();
-      draw();
+      // botMove draws once it has flagged itself as thinking; drawing again here
+      // would rebuild the board underneath the animation we just scheduled
+      if (finishIfOver()) draw();
+      else botMove();
+    }
+
+    /* Where a piece could go if it were our turn. Used for premoves, so it
+       deliberately ignores whatever the opponent is about to do. */
+    function premoveTargets(sq) {
+      return Chess.pseudoMoves(game.state, game.player)
+        .filter(function (m) { return m.from === sq; })
+        .map(function (m) { return m.to; });
     }
 
     function selectSquare(sq) {
-      if (game.over || game.thinking || game.promo) return;
-      if (game.state.turn !== game.player) return;
-
+      if (game.over || game.promo) return;
       var piece = game.state.board[sq];
+      var mine = piece !== 0 && Chess.colorOf(piece) === game.player;
+
+      // the bot is thinking: anything we do here queues a premove
+      if (game.state.turn !== game.player) {
+        if (game.selected >= 0 && game.targets.indexOf(sq) !== -1) {
+          game.premove = { from: game.selected, to: sq };
+          game.selected = -1;
+          game.targets = [];
+          sfx('select');
+        } else if (mine) {
+          game.premove = null;
+          game.selected = sq;
+          game.targets = premoveTargets(sq);
+          sfx('tap');
+        } else {
+          game.selected = -1;
+          game.targets = [];
+          game.premove = null;
+        }
+        draw();
+        return;
+      }
+
       if (game.selected >= 0 && game.targets.indexOf(sq) !== -1) {
         playerMove(game.selected, sq);
         return;
       }
-      if (piece !== 0 && Chess.colorOf(piece) === game.player) {
+      if (mine) {
         game.selected = sq;
         game.targets = Chess.legalMoves(game.state)
           .filter(function (m) { return m.from === sq; })
@@ -4882,6 +5139,8 @@ window.StudyHub = window.StudyHub || {};
       game.awarded = false;
       game.selected = -1;
       game.targets = [];
+      game.premove = null;
+      game.anim = null;
       var prev = game.history[game.history.length - 1];
       game.lastMove = prev ? { from: prev.move.from, to: prev.move.to } : null;
       sfx('tap');
@@ -4914,6 +5173,7 @@ window.StudyHub = window.StudyHub || {};
 
     function drawBoard() {
       var wrap = el('div', 'board-wrap');
+      var cells = {};
       var grid = el('div', 'board board--play');
       var flipped = game.player === 'b';
       var kingInCheck = Chess.inCheck(game.state, game.state.turn)
@@ -4930,6 +5190,7 @@ window.StudyHub = window.StudyHub || {};
           cell.setAttribute('aria-label', Chess.sqName(sq));
 
           if (game.lastMove && (sq === game.lastMove.from || sq === game.lastMove.to)) cell.classList.add('last');
+          if (game.premove && (sq === game.premove.from || sq === game.premove.to)) cell.classList.add('premove');
           if (sq === game.selected) cell.classList.add('sel');
           if (sq === kingInCheck) cell.classList.add('check');
 
@@ -4937,26 +5198,59 @@ window.StudyHub = window.StudyHub || {};
           if (piece !== 0) {
             var white = Chess.isWhitePiece(piece);
             var kind = piece.toLowerCase();
-            var span = el('span', 'piece ' + (white ? 'w' : 'b'), GLYPH[kind]);
+            var span = el('span', 'piece');
+            span.innerHTML = Pieces.svg(piece);
             span.setAttribute('role', 'img');
             span.setAttribute('aria-label', (white ? 'white ' : 'black ') + NAME[kind]);
+            span.dataset.sq = sq;
             cell.appendChild(span);
           }
           if (game.targets.indexOf(sq) !== -1) {
             cell.appendChild(el('span', piece !== 0 ? 'target take' : 'target'));
           }
+          if (col === 0) cell.appendChild(el('span', 'coord rank', String(rank + 1)));
+          if (row === 7) cell.appendChild(el('span', 'coord file', 'abcdefgh'.charAt(file)));
 
+          cells[sq] = cell;
           (function (square) { cell.onclick = function () { selectSquare(square); }; })(sq);
           grid.appendChild(cell);
         }
       }
       wrap.appendChild(grid);
 
-      var coords = el('div', 'board-files');
-      var letters = flipped ? 'hgfedcba' : 'abcdefgh';
-      letters.split('').forEach(function (f) { coords.appendChild(el('span', null, f)); });
-      wrap.appendChild(coords);
+      /* Slide the piece that just moved. The board has already been rebuilt in its
+         new state, so the piece is placed at its destination, shifted back to where
+         it came from, and then released — the browser animates the difference. */
+      if (game.anim) {
+        var anim = game.anim;
+        game.anim = null;
+        requestAnimationFrame(function () {
+          slide(cells[anim.from], cells[anim.to]);
+          if (anim.rookFrom != null) slide(cells[anim.rookFrom], cells[anim.rookTo]);
+        });
+      }
       return wrap;
+    }
+
+    function slide(fromCell, toCell) {
+      if (!fromCell || !toCell) return;
+      var piece = toCell.querySelector('.piece');
+      if (!piece) return;
+      var a = fromCell.getBoundingClientRect(), b = toCell.getBoundingClientRect();
+      var dx = a.left - b.left, dy = a.top - b.top;
+      if (!dx && !dy) return;
+      piece.classList.add('moving');
+      piece.style.transition = 'none';
+      piece.style.transform = 'translate(' + dx + 'px,' + dy + 'px)';
+      // force the browser to accept the offset before transitioning away from it
+      void piece.offsetWidth;
+      piece.style.transition = 'transform ' + ANIM_MS + 'ms cubic-bezier(.2,.7,.3,1)';
+      piece.style.transform = 'translate(0,0)';
+      setTimeout(function () {
+        piece.classList.remove('moving');
+        piece.style.transition = '';
+        piece.style.transform = '';
+      }, ANIM_MS + 30);
     }
 
     function drawMoveList() {
@@ -4975,7 +5269,7 @@ window.StudyHub = window.StudyHub || {};
 
     function statusLine() {
       if (game.over) return game.resultDetail;
-      if (game.thinking) return 'The bot is thinking…';
+      if (game.thinking) return game.premove ? 'The bot is thinking… (premove ready)' : 'The bot is thinking — you can premove';
       if (Chess.inCheck(game.state, game.state.turn)) {
         return game.state.turn === game.player ? 'You are in check!' : 'The bot is in check';
       }
@@ -5002,6 +5296,13 @@ window.StudyHub = window.StudyHub || {};
       status.appendChild(el('strong', null, statusLine()));
       if (game.over && game.xpEarned) status.appendChild(el('span', 'muted', '  +' + game.xpEarned + ' XP'));
       body.appendChild(status);
+
+      if (game.premove && !game.over) {
+        var note = el('div', 'premove-note');
+        note.appendChild(el('span', null, 'Premove: ' + Chess.sqName(game.premove.from) + ' → ' + Chess.sqName(game.premove.to)));
+        note.appendChild(btn('link', 'Cancel', function () { game.premove = null; sfx('tap'); draw(); }));
+        body.appendChild(note);
+      }
 
       if (game.over) {
         var again = el('div', 'play-actions');
@@ -5032,14 +5333,16 @@ window.StudyHub = window.StudyHub || {};
         var kind = String(m.promo).toLowerCase();
         var b = el('button', 'promo-btn');
         b.type = 'button';
-        b.appendChild(el('span', 'piece ' + (game.player === 'w' ? 'w' : 'b'), GLYPH[kind]));
+        var art = el('span', 'piece');
+        art.innerHTML = Pieces.svg(game.player === 'w' ? kind.toUpperCase() : kind);
+        b.appendChild(art);
         b.appendChild(el('span', 'promo-name', NAME[kind]));
         b.onclick = function () {
           game.promo = null;
           document.body.removeChild(back);
           applyMove(m);
-          if (!finishIfOver()) botMove();
-          draw();
+          if (finishIfOver()) draw();
+          else botMove();
         };
         row.appendChild(b);
       });

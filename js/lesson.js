@@ -18,7 +18,6 @@
 
   /* Draw a position from a FEN string. Filled glyphs are used for both sides and
      coloured with CSS, because outline glyphs render inconsistently across fonts. */
-  var GLYPH = { k: '\u265A', q: '\u265B', r: '\u265C', b: '\u265D', n: '\u265E', p: '\u265F' };
   var PIECE_NAME = { k: 'king', q: 'queen', r: 'rook', b: 'bishop', n: 'knight', p: 'pawn' };
 
   function renderBoard(fen) {
@@ -46,19 +45,20 @@
       if (piece) {
         var white = piece === piece.toUpperCase();
         var kind = piece.toLowerCase();
-        var span = el('span', 'piece ' + (white ? 'w' : 'b'), GLYPH[kind]);
+        var span = el('span', 'piece');
+        span.innerHTML = SH.ChessPieces.svg(piece);
         span.setAttribute('role', 'img');
         span.setAttribute('aria-label', (white ? 'white ' : 'black ') + PIECE_NAME[kind] +
           ' on ' + 'abcdefgh'.charAt(fileIndex) + (8 - rowIndex));
         cell.appendChild(span);
       }
+      // coordinates sit in the corner of the edge squares, as on a real board
+      if (fileIndex === 0) cell.appendChild(el('span', 'coord rank', String(8 - rowIndex)));
+      if (rowIndex === 7) cell.appendChild(el('span', 'coord file', 'abcdefgh'.charAt(fileIndex)));
       return cell;
     }
 
     wrap.appendChild(grid);
-    var coords = el('div', 'board-files');
-    'abcdefgh'.split('').forEach(function (f) { coords.appendChild(el('span', null, f)); });
-    wrap.appendChild(coords);
     return wrap;
   }
 

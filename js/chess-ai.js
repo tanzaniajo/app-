@@ -222,6 +222,96 @@
     return { moves: result, nodes: budget.nodes, depth: reached };
   }
 
+  /* The same iterative deepening, but spread across event-loop turns.
+
+     A search that blocks the main thread for two seconds also blocks every click,
+     which makes premoving impossible — the whole point of premoving is to move
+     while the opponent is thinking. So this version works for a slice of a few
+     milliseconds, yields to the browser, and picks up where it left off.
+
+     It runs on a copy of the position, so the board the player is clicking on is
+     never mid-search. */
+  /* Yield to the browser without paying setTimeout's ~4ms clamp, which is a lot
+     of overhead when the search only works for 20ms at a time. */
+  var yieldSoon = (function () {
+    if (typeof MessageChannel === 'function') {
+      var channel = new MessageChannel();
+      var queue = [];
+      channel.port1.onmessage = function () {
+        var fn = queue.shift();
+        if (fn) fn();
+      };
+      return function (fn) { queue.push(fn); channel.port2.postMessage(0); };
+    }
+    return function (fn) { setTimeout(fn, 0); };
+  })();
+
+  var SLICE_MS = 12;
+
+  function chooseMoveAsync(realState, elo, onDone) {
+    var level = levelFor(elo);
+    var legal = Chess.legalMoves(realState);
+    if (!legal.length) return onDone(null);
+
+    function deliver(chosen) {
+      // the move was found on a copy, so look it up again on the real board
+      var uci = Chess.sqName(chosen.move.from) + Chess.sqName(chosen.move.to) +
+                (chosen.move.promo ? String(chosen.move.promo).toLowerCase() : '');
+      var real = Chess.findMove(realState, uci);
+      onDone(real ? { move: real, score: chosen.score, level: level, depth: chosen.depth } : null);
+    }
+
+    if (level.blunder > 0 && Math.random() < level.blunder) {
+      var quiet = legal.filter(function (m) { return !m.captured || VALUE[String(m.captured).toLowerCase()] < 300; });
+      var pool = quiet.length ? quiet : legal;
+      var pick = pool[Math.floor(Math.random() * pool.length)];
+      return setTimeout(function () { onDone({ move: pick, level: level, blundered: true }); }, 30);
+    }
+
+    var state = Chess.clone(realState);
+    var budget = { nodes: 0, max: level.nodes, deadline: Date.now() + level.timeMs, stop: false };
+    var moves = ordered(Chess.legalMoves(state));
+    var best = { move: moves[0], score: 0, depth: 0 };
+    var depth = 1, index = 0, alpha = -MATE, scored = [];
+
+    function slice() {
+      var until = Date.now() + SLICE_MS;      // hand the browser back control this often
+      while (index < moves.length && Date.now() < until) {
+        var m = moves[index];
+        var undo = Chess.make(state, m);
+        var lower = index === 0 ? -MATE : alpha - ROOT_WINDOW;
+        var score = -negamax(state, depth - 1, -MATE, -lower, 1, budget);
+        Chess.unmake(state, m, undo);
+        if (budget.stop) break;
+        scored.push({ move: m, score: score });
+        if (score > alpha) alpha = score;
+        index++;
+      }
+
+      var timeUp = budget.stop || Date.now() > budget.deadline;
+
+      if (index >= moves.length) {                      // finished this depth
+        scored.sort(function (a, b) { return b.score - a.score; });
+        var window = level.noise;
+        var top = scored.filter(function (x) { return scored[0].score - x.score <= window; });
+        var choice = top[Math.floor(Math.random() * top.length)] || scored[0];
+        best = { move: choice.move, score: choice.score, depth: depth };
+
+        var mateFound = Math.abs(scored[0].score) > MATE - 1000;
+        if (depth >= level.depth || timeUp || mateFound) return deliver(best);
+
+        moves = scored.map(function (x) { return x.move; });   // best-first next time
+        depth++; index = 0; alpha = -MATE; scored = [];
+      } else if (timeUp) {
+        return deliver(best);                            // keep the last full depth
+      }
+
+      yieldSoon(slice);
+    }
+
+    yieldSoon(slice);
+  }
+
   var LEVELS = [
     { elo: 400,  name: 'Beginner',     blurb: 'Misses simple threats and gives pieces away',
       depth: 1, blunder: 0.45, noise: 150, nodes: 40000,   timeMs: 120 },
@@ -271,6 +361,7 @@
     evaluate: evaluate,
     rankMoves: rankMoves,
     chooseMove: chooseMove,
+    chooseMoveAsync: chooseMoveAsync,
     LEVELS: LEVELS,
     levelFor: levelFor,
     MATE: MATE,

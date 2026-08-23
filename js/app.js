@@ -47,6 +47,10 @@
     bar.appendChild(el('span', 'stat-pill heart', '❤️ ' + data.hearts.n));
     bar.appendChild(btn('icon-btn', '📊', function () { go('stats'); }));
     bar.appendChild(btn('icon-btn', '👤', function () { go('profile'); }));
+    bar.appendChild(btn('icon-btn', SH.Sfx.muted() ? '🔇' : '🔊', function () {
+      SH.Sfx.toggle();
+      render();
+    }));
     bar.appendChild(btn('icon-btn', document.documentElement.getAttribute('data-theme') === 'dark' ? '☀️' : '🌙',
       function () { SH.Theme.toggle(); render(); }));
     hudEl.appendChild(bar);
@@ -214,9 +218,10 @@
     head.appendChild(h);
     wrap.appendChild(head);
 
-    subject.topics.forEach(function (topic, unitIndex) {
+    var topics = subject.topics.filter(function (t) { return (t.minStage || 0) <= st; });
+    topics.forEach(function (topic, unitIndex) {
       var crowns = SH.Progress.crowns(subject.id, topic.id);
-      var prevComplete = unitIndex === 0 || SH.Progress.unitComplete(subject.id, subject.topics[unitIndex - 1].id);
+      var prevComplete = unitIndex === 0 || SH.Progress.unitComplete(subject.id, topics[unitIndex - 1].id);
 
       var unit = el('div', 'unit');
       unit.style.setProperty('--sub', subject.color);
@@ -249,6 +254,7 @@
             row.style.marginTop = '24px';   // room for the flag above the node
           }
           node.onclick = function () {
+            SH.Sfx.play('tap');
             if (!open) return lockedModal(subject, topic, lessonIndex);
             startLesson(subject, topic, lessonIndex, done ? 'practice' : 'lesson');
           };
@@ -397,7 +403,7 @@
     wrap.lastChild.appendChild(el('h2', null, 'What you are studying'));
     var rows = el('div', 'rows');
     SH.subjects.forEach(function (s) {
-      s.topics.forEach(function (t) {
+      s.topics.filter(function (t) { return (t.minStage || 0) <= p.stageIndex; }).forEach(function (t) {
         var row = el('div', 'row');
         var main = el('div', 'row-main');
         main.appendChild(el('div', 'row-title', s.emoji + '  ' + t.name));

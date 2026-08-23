@@ -38,6 +38,7 @@
   --math: #ff9600;
   --science: #58cc02;
   --chinese: #ff4b4b;
+  --chess: #ce82ff;
 
   --radius: 16px;
   /* system rounded stack: no network fetch, so the app works fully offline */
@@ -409,6 +410,30 @@ button { font-family: inherit; }
   .footbar .btn { width: 100%; }
   .node { width: 64px; height: 60px; font-size: 1.3rem; }
 }
+
+/* ---------------- chess board ---------------- */
+.board-wrap { margin: 0 auto 20px; width: min(340px, 82vw); }
+.board {
+  display: grid; grid-template-columns: repeat(8, 1fr);
+  border-radius: 10px; overflow: hidden;
+  box-shadow: 0 3px 0 rgba(0,0,0,.25);
+}
+.board .sq {
+  aspect-ratio: 1 / 1; display: grid; place-items: center;
+  font-size: clamp(19px, 5.8vw, 31px); line-height: 1;
+}
+.board .sq.light { background: #f0d9b5; }
+.board .sq.dark  { background: #b58863; }
+.board .piece.w {
+  color: #fff;
+  text-shadow: 0 1px 0 #2b2b2b, 0 -1px 0 #2b2b2b, 1px 0 0 #2b2b2b, -1px 0 0 #2b2b2b;
+}
+.board .piece.b { color: #1a1a1a; text-shadow: 0 0 2px rgba(255,255,255,.30); }
+.board-files {
+  display: grid; grid-template-columns: repeat(8, 1fr);
+  font-size: .68rem; font-weight: 800; color: var(--text-dim);
+  text-align: center; padding-top: 4px;
+}
 </style>
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>📚</text></svg>">
 </head>
@@ -515,12 +540,19 @@ window.StudyHub = window.StudyHub || {};
       return write(d).hearts.n;
     },
 
-    /* ---- lessons ---- */
-    lessonKey: function (s, t, i) { return s + '/' + t + '/' + i; },
-    lesson: function (s, t, i) { return Progress.all().lessons[s + '/' + t + '/' + i] || null; },
+    /* ---- lessons ----
+       Keys carry the syllabus stage, because a lesson cleared as a nine-year-old
+       is not the same lesson as an adult sees. Changing your age therefore gives
+       you a fresh path, and changing back restores the one you had. */
+    stageId: function () {
+      var p = Profile.get();
+      return p ? p.stage.id : 'middle';
+    },
+    lessonKey: function (s, t, i) { return Progress.stageId() + '/' + s + '/' + t + '/' + i; },
+    lesson: function (s, t, i) { return Progress.all().lessons[Progress.lessonKey(s, t, i)] || null; },
     crowns: function (s, t) {
       var d = Progress.all(), n = 0;
-      for (var i = 0; i < LESSONS_PER_UNIT; i++) if (d.lessons[s + '/' + t + '/' + i]) n++;
+      for (var i = 0; i < LESSONS_PER_UNIT; i++) if (d.lessons[Progress.lessonKey(s, t, i)]) n++;
       return n;
     },
     unitComplete: function (s, t) { return Progress.crowns(s, t) >= LESSONS_PER_UNIT; },
@@ -529,7 +561,7 @@ window.StudyHub = window.StudyHub || {};
     finishLesson: function (opts) {
       var d = Progress.all();
       var key = opts.subject + '/' + opts.topic;
-      var lessonKey = key + '/' + opts.lesson;
+      var lessonKey = Progress.lessonKey(opts.subject, opts.topic, opts.lesson);
       var pct = opts.asked ? Math.round((opts.correct / opts.asked) * 100) : 0;
 
       if (opts.passed) {
@@ -568,8 +600,9 @@ window.StudyHub = window.StudyHub || {};
         out.correct += d.topics[k].correct;
         out.sessions += d.topics[k].sessions;
       });
+      var prefix = Progress.stageId() + '/' + subjectId + '/';
       Object.keys(d.lessons).forEach(function (k) {
-        if (k.indexOf(subjectId + '/') === 0) out.crowns++;
+        if (k.indexOf(prefix) === 0) out.crowns++;
       });
       return out;
     },
@@ -672,22 +705,41 @@ window.StudyHub = window.StudyHub || {};
       }
       return out;
     },
-    /* Keep only bank items whose difficulty band suits the learner's stage.
-       Bank items carry their band as the last element of the tuple. If the
-       stage's own bands hold too little, widen downwards so nothing is empty. */
+    /* Choose the bank items that suit a learner's stage.
+
+       Items carry their difficulty band as the last element of the tuple. We take
+       everything in the stage's own bands; only if that is too thin do we reach for
+       the NEAREST band outwards, one step at a time. Never dump the whole bank —
+       that is how a seven-year-old ends up with GCSE questions, and a
+       seventeen-year-old with "which animal is a mammal". */
     forStage: function (bank, stageIndex) {
       var stage = STAGES[stageIndex == null ? 2 : stageIndex];
       var want = stage.bands;
+      var MIN = 8;
+
       function bandOf(it) {
         var b = it[it.length - 1];
         return typeof b === 'number' ? b : 2;
       }
-      var inStage = bank.filter(function (it) { return want.indexOf(bandOf(it)) !== -1; });
-      if (inStage.length >= 8) return inStage;
-      var ceiling = Math.max.apply(null, want);
-      var widened = bank.filter(function (it) { return bandOf(it) <= ceiling; });
-      return widened.length ? widened : bank;
+      function distance(it) {
+        var b = bandOf(it), d = Infinity;
+        for (var i = 0; i < want.length; i++) d = Math.min(d, Math.abs(b - want[i]));
+        return d;
+      }
+
+      var buckets = [];
+      bank.forEach(function (it) {
+        var d = distance(it);
+        (buckets[d] = buckets[d] || []).push(it);
+      });
+
+      var out = [];
+      for (var d = 0; d < buckets.length && out.length < MIN; d++) {
+        if (buckets[d]) out = out.concat(buckets[d]);
+      }
+      return out.length ? out : bank;
     },
+
     /* Multiple choice from a correct value plus a pool of distractors. */
     choice: function (prompt, correct, pool, extra) {
       var seen = {}; seen[String(correct)] = true;
@@ -727,6 +779,93 @@ window.StudyHub = window.StudyHub || {};
   SH.subject = function (id) {
     for (var i = 0; i < SH.subjects.length; i++) if (SH.subjects[i].id === id) return SH.subjects[i];
     return null;
+  };
+})(window.StudyHub);
+</script>
+<script>
+/* Sound effects, synthesised with the Web Audio API.
+   No audio files, so the app stays a single self-contained page that works offline. */
+(function (SH) {
+  'use strict';
+
+  var KEY = 'studyhub.sound';
+  var ctx = null;
+  var muted = false;
+
+  try { muted = localStorage.getItem(KEY) === 'off'; } catch (e) {}
+
+  /* The context can only start from a user gesture, so it is created on first play. */
+  function audio() {
+    if (ctx) return ctx;
+    var Ctor = window.AudioContext || window.webkitAudioContext;
+    if (!Ctor) return null;
+    try { ctx = new Ctor(); } catch (e) { return null; }
+    return ctx;
+  }
+
+  /* One shaped tone. `to` bends the pitch across the note. */
+  function tone(opts) {
+    var c = audio();
+    if (!c) return;
+    if (c.state === 'suspended' && c.resume) c.resume();
+
+    var start = c.currentTime + (opts.delay || 0);
+    var dur = opts.dur || 0.12;
+    var osc = c.createOscillator();
+    var gain = c.createGain();
+
+    osc.type = opts.type || 'sine';
+    osc.frequency.setValueAtTime(opts.freq, start);
+    if (opts.to) osc.frequency.exponentialRampToValueAtTime(opts.to, start + dur);
+
+    var peak = opts.gain == null ? 0.13 : opts.gain;
+    gain.gain.setValueAtTime(0.0001, start);
+    gain.gain.exponentialRampToValueAtTime(peak, start + 0.012);
+    gain.gain.exponentialRampToValueAtTime(0.0001, start + dur);
+
+    osc.connect(gain);
+    gain.connect(c.destination);
+    osc.start(start);
+    osc.stop(start + dur + 0.02);
+  }
+
+  function play(notes) {
+    if (muted) return;
+    for (var i = 0; i < notes.length; i++) tone(notes[i]);
+  }
+
+  var SOUNDS = {
+    tap:      [{ freq: 320, dur: 0.05, type: 'triangle', gain: 0.06 }],
+    select:   [{ freq: 520, dur: 0.06, type: 'triangle', gain: 0.07 }],
+    correct:  [{ freq: 784, dur: 0.10, type: 'sine', gain: 0.13 },
+               { freq: 1175, dur: 0.16, type: 'sine', gain: 0.12, delay: 0.09 }],
+    wrong:    [{ freq: 220, to: 120, dur: 0.28, type: 'sawtooth', gain: 0.09 }],
+    heart:    [{ freq: 440, to: 180, dur: 0.34, type: 'triangle', gain: 0.10, delay: 0.16 }],
+    complete: [{ freq: 523, dur: 0.13, type: 'sine', gain: 0.12 },
+               { freq: 659, dur: 0.13, type: 'sine', gain: 0.12, delay: 0.11 },
+               { freq: 784, dur: 0.13, type: 'sine', gain: 0.12, delay: 0.22 },
+               { freq: 1047, dur: 0.34, type: 'sine', gain: 0.14, delay: 0.33 }],
+    crown:    [{ freq: 1047, dur: 0.22, type: 'sine', gain: 0.11 },
+               { freq: 1568, dur: 0.34, type: 'sine', gain: 0.09, delay: 0.06 }],
+    fail:     [{ freq: 392, dur: 0.18, type: 'triangle', gain: 0.11 },
+               { freq: 311, dur: 0.18, type: 'triangle', gain: 0.11, delay: 0.15 },
+               { freq: 233, dur: 0.40, type: 'triangle', gain: 0.11, delay: 0.30 }],
+    move:     [{ freq: 180, dur: 0.06, type: 'square', gain: 0.05 },
+               { freq: 130, dur: 0.05, type: 'square', gain: 0.04, delay: 0.03 }]
+  };
+
+  SH.Sfx = {
+    play: function (name) {
+      var s = SOUNDS[name];
+      if (s) play(s);
+    },
+    muted: function () { return muted; },
+    toggle: function () {
+      muted = !muted;
+      try { localStorage.setItem(KEY, muted ? 'off' : 'on'); } catch (e) {}
+      if (!muted) SH.Sfx.play('select');
+      return muted;
+    }
   };
 })(window.StudyHub);
 </script>
@@ -910,6 +1049,10 @@ window.StudyHub = window.StudyHub || {};
 
   /* [idiom, meaning, band] */
   var IDIOMS = [
+    ['hit the nail on the head', 'to describe something exactly right', 2],
+    ['out of the blue', 'completely unexpectedly', 2],
+    ['a blessing in disguise', 'something that seems bad but turns out well', 3],
+    ['burn the midnight oil', 'to work or study late into the night', 3],
     ['piece of cake', 'something very easy to do', 1],
     ['break the ice', 'to make people feel relaxed when they first meet', 1],
     ['under the weather', 'feeling slightly ill', 1],
@@ -1786,6 +1929,10 @@ window.StudyHub = window.StudyHub || {};
 
   /* Each item: [question, [options — first one is correct], explanation] */
   var BIOLOGY = [
+    ['What is the role of ribosomes?', ['They build proteins from amino acids', 'They store DNA', 'They release energy', 'They digest waste'], 'Ribosomes read mRNA and assemble the protein it codes for.', 3],
+    ['Which molecule carries the code from DNA to the ribosome?', ['mRNA', 'ATP', 'Glucose', 'Haemoglobin'], 'Messenger RNA is transcribed from DNA and travels out of the nucleus.', 3],
+    ['Roughly how much energy passes from one level of a food chain to the next?', ['About 10% — most is lost as heat', '100%', 'About 90%', 'None'], 'That loss is why food chains rarely have more than four or five levels.', 3],
+    ['What is homeostasis?', ['Keeping internal conditions stable', 'Copying DNA before division', 'Building new proteins', 'Fighting infection'], 'Temperature, blood sugar and water balance are all held within narrow limits.', 3],
     ['Which of these is a living thing?', ['A tree', 'A rock', 'A cloud', 'A spoon'], 'Living things grow, feed and reproduce. A tree does; a rock does not.', 1],
     ['What do humans breathe in to stay alive?', ['Oxygen', 'Carbon dioxide', 'Helium', 'Smoke'], 'We take oxygen from the air into our lungs.', 1],
     ['Which body part do you use to smell?', ['Nose', 'Ear', 'Elbow', 'Knee'], 'The nose contains cells that detect smells.', 1],
@@ -1879,6 +2026,9 @@ window.StudyHub = window.StudyHub || {};
   ];
 
   var EARTH = [
+    ['Radiometric dating works by measuring...', ['The decay of unstable isotopes in rock', 'The thickness of the soil above', 'The height of nearby mountains', 'The salinity of the ocean'], 'Known half-lives turn isotope ratios into an age.', 3],
+    ['The Moon always shows Earth the same face because...', ['Its rotation and its orbit take the same time', 'It does not rotate at all', 'Earth blocks the far side', 'It is too distant to see turning'], 'This is called tidal locking.', 3],
+    ['Sea-floor spreading is strong evidence for...', ['Plate tectonics', 'A shrinking Earth', 'A completely fixed crust', 'A young Earth'], 'Magnetic stripes either side of mid-ocean ridges record the spreading.', 3],
     ['Which object gives the Earth its light and heat?', ['The Sun', 'The Moon', 'A star called Sirius', 'A comet'], 'The Sun is our nearest star.', 1],
     ['How many days are there in a week?', ['7', '5', '10', '12'], 'A week has seven days.', 1],
     ['What falls from clouds as rain?', ['Water', 'Sand', 'Rocks', 'Air'], 'Clouds hold tiny water droplets that join and fall as rain.', 1],
@@ -1910,6 +2060,10 @@ window.StudyHub = window.StudyHub || {};
   ];
 
   var METHOD = [
+    ['What is a prediction?', ['A sensible statement of what you think will happen', 'The final result', 'A measurement you took', 'A drawing of the equipment'], 'You make it before the experiment, so the experiment can test it.', 1],
+    ['Why do scientists wear goggles in a practical?', ['To protect their eyes', 'To see small things better', 'To look the part', 'To measure light levels'], 'Safety equipment is part of planning any experiment.', 1],
+    ['What is a double-blind trial?', ['Neither the participants nor the researchers know who received the treatment', 'Nobody writes down the results', 'Only one group is tested', 'The experiment is run twice'], 'It removes expectation effects from both sides at once.', 3],
+    ['A confounding variable is one that...', ['Changes along with what you are testing, muddling the result', 'Is deliberately held constant', 'Has no effect on anything', 'Is measured twice for accuracy'], 'Randomisation is the usual defence against confounders.', 3],
     ['Before you start an experiment you should...', ['Predict what you think will happen', 'Write the conclusion first', 'Change every variable', 'Throw away the equipment'], 'A prediction gives you something to test.', 1],
     ['Which tool would you use to measure temperature?', ['A thermometer', 'A ruler', 'A stopwatch', 'A balance'], 'Thermometers measure how hot or cold something is.', 1],
     ['If you measure something three times, you should...', ['Compare the results and look for odd ones', 'Only keep the biggest', 'Only keep the smallest', 'Ignore them all'], 'Repeats help you spot mistakes.', 1],
@@ -1972,12 +2126,91 @@ window.StudyHub = window.StudyHub || {};
 })(window.StudyHub);
 </script>
 <script>
-/* Chinese (Mandarin, simplified) — characters, pinyin, meaning, numbers, phrases and grammar. */
+/* Chinese (Mandarin, simplified) — characters, tones, sentences, idioms and grammar.
+   Bank items end with a difficulty band: 1 = ages 4–10, 2 = 11–13, 3 = 14+.
+
+   Distractors are deliberately hostile: wrong answers are tone variants of the right
+   answer, or words that share a character with it, so a question cannot be solved by
+   recognising the shape of the answer alone. */
 (function (SH) {
   'use strict';
   var U = SH.U;
 
-  /* [hanzi, pinyin, english] */
+  /* ============================ tone machinery ============================ */
+  var TONE_ROWS = { a: 'āáǎà', e: 'ēéěè', i: 'īíǐì', o: 'ōóǒò', u: 'ūúǔù', 'ü': 'ǖǘǚǜ' };
+  var BASE_OF = {};      // 'ā' -> { base: 'a', tone: 1 }
+  Object.keys(TONE_ROWS).forEach(function (base) {
+    TONE_ROWS[base].split('').forEach(function (ch, i) { BASE_OF[ch] = { base: base, tone: i + 1 }; });
+  });
+  var VOWELS = 'aeiouüāáǎàēéěèīíǐìōóǒòūúǔùǖǘǚǜ';
+
+  function stripTones(s) {
+    return s.split('').map(function (ch) { return BASE_OF[ch] ? BASE_OF[ch].base : ch; }).join('');
+  }
+
+  /* Runs of consecutive vowels — one per syllable nucleus. */
+  function vowelGroups(word) {
+    var groups = [], start = -1;
+    for (var i = 0; i <= word.length; i++) {
+      var isVowel = i < word.length && VOWELS.indexOf(word.charAt(i)) !== -1;
+      if (isVowel && start === -1) start = i;
+      else if (!isVowel && start !== -1) { groups.push({ start: start, end: i }); start = -1; }
+    }
+    return groups;
+  }
+
+  /* Standard placement: a wins, then o/e, otherwise the last vowel of the group. */
+  function markIndex(group) {
+    var lower = group.toLowerCase();
+    var a = lower.indexOf('a');
+    if (a !== -1) return a;
+    var o = lower.indexOf('o'), e = lower.indexOf('e');
+    if (o !== -1) return o;
+    if (e !== -1) return e;
+    return group.length - 1;
+  }
+
+  /* Rewrite one syllable of `word` with a different tone (0 = neutral). */
+  function setTone(word, groupIndex, tone) {
+    var groups = vowelGroups(word);
+    if (!groups[groupIndex]) return word;
+    var g = groups[groupIndex];
+    var raw = stripTones(word.slice(g.start, g.end));
+    var at = markIndex(raw);
+    var marked = raw.split('');
+    if (tone > 0) {
+      var row = TONE_ROWS[marked[at]];
+      if (!row) return word;
+      marked[at] = row.charAt(tone - 1);
+    }
+    return word.slice(0, g.start) + marked.join('') + word.slice(g.end);
+  }
+
+  function toneOf(word, groupIndex) {
+    var groups = vowelGroups(word);
+    if (!groups[groupIndex]) return 0;
+    var seg = word.slice(groups[groupIndex].start, groups[groupIndex].end);
+    for (var i = 0; i < seg.length; i++) if (BASE_OF[seg.charAt(i)]) return BASE_OF[seg.charAt(i)].tone;
+    return 0;
+  }
+
+  /* Every same-spelling, different-tone version of a word. These are the hard ones. */
+  function toneVariants(pinyin) {
+    var groups = vowelGroups(pinyin);
+    var out = [];
+    for (var g = 0; g < groups.length; g++) {
+      var current = toneOf(pinyin, g);
+      for (var t = 0; t <= 4; t++) {
+        if (t === current) continue;
+        var v = setTone(pinyin, g, t);
+        if (v !== pinyin && out.indexOf(v) === -1) out.push(v);
+      }
+    }
+    return out;
+  }
+
+  /* ============================== vocabulary ============================== */
+  /* [hanzi, pinyin, english, band] */
   var VOCAB = [
     ['我', 'wǒ', 'I; me', 1], ['你', 'nǐ', 'you', 1], ['他', 'tā', 'he; him', 1], ['她', 'tā', 'she; her', 1],
     ['我们', 'wǒmen', 'we; us', 1], ['好', 'hǎo', 'good; well', 1], ['是', 'shì', 'to be', 1], ['不', 'bù', 'not', 1],
@@ -1989,8 +2222,8 @@ window.StudyHub = window.StudyHub || {};
     ['什么', 'shénme', 'what', 1], ['谁', 'shéi', 'who', 1], ['哪儿', 'nǎr', 'where', 1], ['怎么', 'zěnme', 'how', 1],
     ['为什么', 'wèishénme', 'why', 2], ['多少', 'duōshao', 'how many; how much', 2],
     ['今天', 'jīntiān', 'today', 1], ['明天', 'míngtiān', 'tomorrow', 1], ['昨天', 'zuótiān', 'yesterday', 1],
-    ['现在', 'xiànzài', 'now', 1], ['年', 'nián', 'year', 1], ['月', 'yuè', 'month; moon', 1], ['星期', 'xīngqī', 'week', 1],
-    ['点', 'diǎn', 'o\'clock; dot', 2], ['分钟', 'fēnzhōng', 'minute', 2],
+    ['现在', 'xiànzài', 'now', 1], ['年', 'nián', 'year', 1], ['月', 'yuè', 'month; moon', 1],
+    ['星期', 'xīngqī', 'week', 1], ['点', 'diǎn', 'o\'clock; dot', 2], ['分钟', 'fēnzhōng', 'minute', 2],
     ['吃', 'chī', 'to eat', 1], ['喝', 'hē', 'to drink', 1], ['水', 'shuǐ', 'water', 1], ['茶', 'chá', 'tea', 1],
     ['米饭', 'mǐfàn', 'cooked rice', 2], ['菜', 'cài', 'dish; vegetable', 2], ['苹果', 'píngguǒ', 'apple', 1],
     ['说', 'shuō', 'to speak', 1], ['看', 'kàn', 'to look; to watch', 1], ['听', 'tīng', 'to listen', 1],
@@ -2007,10 +2240,81 @@ window.StudyHub = window.StudyHub || {};
     ['天气', 'tiānqì', 'weather', 2], ['冷', 'lěng', 'cold', 1], ['热', 'rè', 'hot', 1], ['下雨', 'xiàyǔ', 'to rain', 2],
     ['猫', 'māo', 'cat', 1], ['狗', 'gǒu', 'dog', 1], ['东西', 'dōngxi', 'thing; stuff', 2],
     ['高兴', 'gāoxìng', 'happy; glad', 2], ['漂亮', 'piàoliang', 'pretty', 3], ['新', 'xīn', 'new', 1],
-    ['老', 'lǎo', 'old', 1], ['快', 'kuài', 'fast', 1], ['慢', 'màn', 'slow', 1], ['多', 'duō', 'many', 1], ['少', 'shǎo', 'few', 1]
+    ['老', 'lǎo', 'old', 1], ['快', 'kuài', 'fast', 1], ['慢', 'màn', 'slow', 1], ['多', 'duō', 'many', 1],
+    ['少', 'shǎo', 'few', 1],
+
+    /* --- HSK 3–5: the material an older or returning learner actually needs --- */
+    ['问题', 'wèntí', 'problem; question', 2],
+    ['公司', 'gōngsī', 'company', 2],
+    ['开始', 'kāishǐ', 'to begin', 2],
+    ['重要', 'zhòngyào', 'important', 2],
+    ['希望', 'xīwàng', 'to hope', 2],
+    ['准备', 'zhǔnbèi', 'to prepare', 2],
+    ['因为', 'yīnwèi', 'because', 2],
+    ['所以', 'suǒyǐ', 'therefore', 2],
+    ['但是', 'dànshì', 'but', 2],
+    ['如果', 'rúguǒ', 'if', 2],
+    ['经济', 'jīngjì', 'economy', 3],
+    ['政府', 'zhèngfǔ', 'government', 3],
+    ['社会', 'shèhuì', 'society', 3],
+    ['文化', 'wénhuà', 'culture', 3],
+    ['历史', 'lìshǐ', 'history', 3],
+    ['科学', 'kēxué', 'science', 3],
+    ['技术', 'jìshù', 'technology', 3],
+    ['环境', 'huánjìng', 'environment', 3],
+    ['方法', 'fāngfǎ', 'method', 3],
+    ['结果', 'jiéguǒ', 'result', 3],
+    ['原因', 'yuányīn', 'reason; cause', 3],
+    ['影响', 'yǐngxiǎng', 'influence; to affect', 3],
+    ['关系', 'guānxi', 'relationship; connection', 3],
+    ['机会', 'jīhuì', 'opportunity', 3],
+    ['计划', 'jìhuà', 'plan', 3],
+    ['经验', 'jīngyàn', 'experience', 3],
+    ['能力', 'nénglì', 'ability', 3],
+    ['责任', 'zérèn', 'responsibility', 3],
+    ['条件', 'tiáojiàn', 'condition; requirement', 3],
+    ['情况', 'qíngkuàng', 'situation', 3],
+    ['标准', 'biāozhǔn', 'standard', 3],
+    ['质量', 'zhìliàng', 'quality', 3],
+    ['价格', 'jiàgé', 'price', 3],
+    ['市场', 'shìchǎng', 'market', 3],
+    ['经理', 'jīnglǐ', 'manager', 3],
+    ['同事', 'tóngshì', 'colleague', 3],
+    ['会议', 'huìyì', 'meeting', 3],
+    ['决定', 'juédìng', 'to decide', 3],
+    ['选择', 'xuǎnzé', 'to choose', 3],
+    ['解决', 'jiějué', 'to solve', 3],
+    ['提高', 'tígāo', 'to raise; to improve', 3],
+    ['增加', 'zēngjiā', 'to increase', 3],
+    ['减少', 'jiǎnshǎo', 'to reduce', 3],
+    ['改变', 'gǎibiàn', 'to change', 3],
+    ['发展', 'fāzhǎn', 'to develop', 3],
+    ['成功', 'chénggōng', 'success', 3],
+    ['失败', 'shībài', 'failure', 3],
+    ['努力', 'nǔlì', 'to make an effort', 3],
+    ['坚持', 'jiānchí', 'to persist', 3],
+    ['理解', 'lǐjiě', 'to understand', 3],
+    ['认为', 'rènwéi', 'to think; to consider', 3],
+    ['建议', 'jiànyì', 'to suggest', 3],
+    ['讨论', 'tǎolùn', 'to discuss', 3],
+    ['研究', 'yánjiū', 'to research', 3],
+    ['发现', 'fāxiàn', 'to discover', 3],
+    ['安排', 'ānpái', 'to arrange', 3],
+    ['参加', 'cānjiā', 'to take part in', 3],
+    ['完成', 'wánchéng', 'to complete', 3],
+    ['继续', 'jìxù', 'to continue', 3],
+    ['结束', 'jiéshù', 'to end', 3],
+    ['主要', 'zhǔyào', 'main; principal', 3],
+    ['特别', 'tèbié', 'especially', 3],
+    ['一定', 'yídìng', 'certainly', 3],
+    ['可能', 'kěnéng', 'possible; maybe', 3],
+    ['必须', 'bìxū', 'must', 3],
+    ['应该', 'yīnggāi', 'should', 3],
+    ['虽然', 'suīrán', 'although', 3],
+    ['而且', 'érqiě', 'moreover', 3]
   ];
 
-  /* [hanzi, pinyin, english] */
+  /* [hanzi, pinyin, english, band] */
   var PHRASES = [
     ['你好', 'nǐ hǎo', 'Hello', 1],
     ['谢谢', 'xièxie', 'Thank you', 1],
@@ -2021,7 +2325,6 @@ window.StudyHub = window.StudyHub || {};
     ['请问', 'qǐngwèn', 'Excuse me, may I ask...', 2],
     ['早上好', 'zǎoshang hǎo', 'Good morning', 1],
     ['晚安', 'wǎn\'ān', 'Good night', 1],
-    ['我叫…', 'wǒ jiào…', 'My name is...', 1],
     ['认识你很高兴', 'rènshi nǐ hěn gāoxìng', 'Nice to meet you', 3],
     ['多少钱', 'duōshao qián', 'How much does it cost?', 2],
     ['我不明白', 'wǒ bù míngbai', 'I don\'t understand', 2],
@@ -2031,68 +2334,182 @@ window.StudyHub = window.StudyHub || {};
     ['我饿了', 'wǒ è le', 'I\'m hungry', 2],
     ['没问题', 'méi wèntí', 'No problem', 2],
     ['加油', 'jiāyóu', 'Keep going! / Good luck!', 1],
-    ['慢一点', 'màn yìdiǎn', 'A bit slower, please', 2]
+    ['慢一点', 'màn yìdiǎn', 'A bit slower, please', 2],
+    ['好久不见', 'hǎojiǔ bú jiàn', 'Long time no see', 3],
+    ['麻烦你了', 'máfan nǐ le', 'Sorry to trouble you', 3],
+    ['随便', 'suíbiàn', 'Whatever you like; as you please', 3],
+    ['不见不散', 'bú jiàn bú sàn', 'Be there or be square', 3],
+    ['我尽量', 'wǒ jǐnliàng', 'I\'ll do my best', 3]
   ];
 
-  /* [question, [options — first is correct], explanation] */
+  /* [四字成语, pinyin, meaning, band] */
+  var CHENGYU = [
+    ['马马虎虎', 'mǎmǎhūhū', 'so-so; careless', 3],
+    ['一举两得', 'yì jǔ liǎng dé', 'to kill two birds with one stone', 3],
+    ['半途而废', 'bàn tú ér fèi', 'to give up halfway', 3],
+    ['入乡随俗', 'rù xiāng suí sú', 'when in Rome, do as the Romans do', 3],
+    ['画蛇添足', 'huà shé tiān zú', 'to ruin something by overdoing it', 3],
+    ['守株待兔', 'shǒu zhū dài tù', 'to wait idly for a windfall', 3],
+    ['亡羊补牢', 'wáng yáng bǔ láo', 'better late than never', 3],
+    ['对牛弹琴', 'duì niú tán qín', 'to cast pearls before swine', 3],
+    ['自相矛盾', 'zì xiāng máo dùn', 'to contradict oneself', 3],
+    ['井底之蛙', 'jǐng dǐ zhī wā', 'someone with a narrow outlook', 3],
+    ['熟能生巧', 'shú néng shēng qiǎo', 'practice makes perfect', 3],
+    ['不可思议', 'bù kě sī yì', 'inconceivable; unimaginable', 3],
+    ['迫不及待', 'pò bù jí dài', 'unable to wait any longer', 3],
+    ['名副其实', 'míng fù qí shí', 'living up to its name', 3],
+    ['一帆风顺', 'yì fān fēng shùn', 'smooth sailing all the way', 3],
+    ['乱七八糟', 'luàn qī bā zāo', 'in a complete mess', 3],
+    ['无论如何', 'wúlùn rúhé', 'no matter what', 3],
+    ['千方百计', 'qiān fāng bǎi jì', 'by every possible means', 3],
+    ['三心二意', 'sān xīn èr yì', 'to be of two minds; half-hearted', 3],
+    ['入木三分', 'rù mù sān fēn', 'penetrating; deeply incisive', 3]
+  ];
+
+  /* [sentence with ___, [options — first is correct], explanation, band] */
+  var SENTENCES = [
+    ['我___学生。', ['是', '有', '在', '很'], '是 links two nouns: 我是学生 — "I am a student."', 1],
+    ['他___老师。', ['是', '有', '很', '和'], '是 is used before a noun; 很 would only work before an adjective.', 1],
+    ['我___苹果。', ['吃', '喝', '看', '写'], '吃 is for eating; 喝 is for drinking.', 1],
+    ['我喜欢___茶。', ['喝', '吃', '听', '读'], 'Tea is drunk, so 喝茶.', 1],
+    ['我有___个哥哥。', ['一', '是', '很', '的'], 'A number goes before the measure word: 一个哥哥.', 1],
+    ['猫在桌子___。', ['上', '是', '有', '很'], 'Position words follow the noun: 桌子上 — "on the table."', 1],
+    ['我___去学校。', ['要', '是', '的', '很'], '要 before a verb means "want to" or "will".', 1],
+    ['这___我的书。', ['是', '有', '很', '在'], '这是我的书 — "This is my book."', 1],
+    ['我___北京住了三年。', ['在', '是', '有', '和'], '在 marks location: 我在北京住了三年 — "I lived in Beijing for three years."', 2],
+    ['他跑___很快。', ['得', '的', '地', '了'], 'A degree complement after a verb uses 得: 跑得很快 — "runs fast."', 2],
+    ['天气越来越___了。', ['冷', '冷冷', '很冷', '不冷'], '越来越 + plain adjective. Never add 很 after 越来越.', 2],
+    ['我的自行车___偷了。', ['被', '把', '在', '给了'], '被 marks the passive: "my bike was stolen."', 3],
+    ['请___门关上。', ['把', '被', '让', '给'], 'The 把 construction moves the object before the verb: 把门关上 — "close the door."', 3],
+    ['他八点就来了，我十点___来。', ['才', '就', '再', '又'], '就 = earlier than expected; 才 = later than expected.', 3],
+    ['我昨天去了，今天___去了一次。', ['又', '再', '还', '也'], '又 is for repetition that has already happened; 再 is for repetition still to come.', 3],
+    ['这本书我看___了。', ['懂', '好了', '着', '过来'], 'A resultative complement: 看懂 means "read and understood."', 3],
+    ['___天气不好，我们还是去了。', ['虽然', '因为', '所以', '如果'], '虽然…还是/但是… — "although the weather was bad, we still went."', 3],
+    ['他不但会说中文，___会写汉字。', ['而且', '但是', '所以', '因为'], '不但…而且… — "not only… but also…"', 3],
+    ['___你有时间，我们就去看电影。', ['如果', '虽然', '因为', '但是'], '如果…就… is the standard "if… then…" pattern.', 3],
+    ['我___过日本，那是三年前。', ['去', '去了', '在去', '要去'], '过 follows the bare verb to mark past experience: 去过 — "have been to."', 2],
+    ['她一边听音乐，一边___作业。', ['做', '作', '坐', '座'], '一边…一边… means two actions at once. 做作业 = "do homework."', 2],
+    ['除了中文___，他还会说法语。', ['以外', '以后', '的话', '一样'], '除了…以外，还… — "besides Chinese, he also speaks French."', 3],
+    ['这个问题比那个___。', ['难', '很难', '难了', '太难'], 'After 比 the adjective stands alone — never with 很 or 太.', 3],
+    ['我们是坐飞机___的。', ['来', '来了', '会来', '在来'], '是…的 highlights how something happened: 是坐飞机来的.', 3],
+    ['他把钥匙放___桌子上了。', ['在', '到', '给', '了'], '放在 + place is the fixed pattern for setting something down somewhere.', 3],
+    ['你___吃过北京烤鸭吗？', ['有没有', '不是', '没有吗', '是不是有'], '有没有 + verb forms a neutral yes/no question about experience.', 3],
+    ['时间过得真___！', ['快', '快快', '很快', '快了'], 'In an exclamation with 真, the adjective stands bare: 真快!', 2],
+    ['他汉语说得比我___多了。', ['好', '很好', '好的', '好了'], 'With 比 and 多了, the adjective is bare: 比我好多了 — "much better than me."', 3]
+  ];
+
+  /* [question, [options — first is correct], explanation, band] */
+  var CONFUSABLE = [
+    ['Which character means "big"?', ['大', '太', '犬', '天'], '大 dà = big. 太 tài (too) adds a dot; 犬 quǎn (dog) puts the dot on the other side.', 1],
+    ['Which character means "person"?', ['人', '入', '八', '个'], '人 rén = person. 入 rù (to enter) has its top stroke pointing the other way.', 1],
+    ['Which character means "sun; day"?', ['日', '目', '白', '月'], '日 rì has two strokes inside; 目 mù (eye) has three.', 1],
+    ['Which character means "eye"?', ['目', '日', '自', '月'], '目 mù = eye — think of an eye turned on its side.', 1],
+    ['Which character means "moon; month"?', ['月', '日', '目', '用'], '月 yuè = moon or month, with its curved left stroke.', 1],
+    ['Which character means "water"?', ['水', '冰', '永', '米'], '水 shuǐ = water. 米 mǐ (rice) has extra strokes at the top.', 1],
+    ['Which character means "small"?', ['小', '少', '大', '示'], '小 xiǎo = small. 少 shǎo (few) adds one extra stroke.', 1],
+    ['Which character means "mouth"?', ['口', '日', '中', '回'], '口 kǒu = mouth, a simple square. 回 huí is a square inside a square.', 1],
+    ['Which character means "to borrow or lend"?', ['借', '错', '惜', '籍'], '借 jiè = borrow/lend. 错 cuò = wrong; 惜 xī = to cherish. All share 昔.', 3],
+    ['Which character means "to wear (clothes)"?', ['穿', '川', '船', '传'], '穿 chuān = to wear or pass through. The others all sound like chuán/chuān too.', 3],
+    ['Which character means "already"?', ['已', '己', '巳', '包'], '已 yǐ = already; 己 jǐ = oneself. The stroke on the left is what separates them.', 2],
+    ['Which character means "oneself"?', ['己', '已', '巳', '导'], '自己 zìjǐ = oneself. 已 (already) closes further at the top left.', 2],
+    ['Which character means "to sell"?', ['卖', '买', '实', '头'], '卖 mài (sell) has 十 on top; 买 mǎi (buy) does not. Tone and shape both differ.', 2],
+    ['Which character means "to buy"?', ['买', '卖', '关', '头'], '买 mǎi = buy (third tone); 卖 mài = sell (fourth tone).', 2],
+    ['Which character means "which"?', ['哪', '那', '娜', '呐'], '哪 nǎ = which (a question word); 那 nà = that. The 口 radical marks the question.', 2],
+    ['Which character means "again" (in the future)?', ['再', '在', '存', '有'], '再 zài = again; 在 zài = at/in. Same sound, completely different jobs.', 3],
+    ['Which character means "end; final"?', ['末', '未', '木', '本'], '末 mò = end (long stroke on top); 未 wèi = not yet (short stroke on top).', 3],
+    ['Which character means "not yet"?', ['未', '末', '朱', '来'], '未 wèi — the upper horizontal stroke is the shorter one.', 3],
+    ['Which character means "to look for"?', ['找', '我', '战', '成'], '找 zhǎo = to look for; 我 wǒ = I. The hand radical 扌 marks the action.', 2],
+    ['Which character means "to sit"?', ['坐', '座', '做', '作'], '坐 zuò = to sit (the verb); 座 zuò = a seat (the noun).', 2],
+    ['Which of these means "to do; to make"?', ['做', '作', '坐', '座'], '做 is the everyday verb (做饭, 做作业); 作 appears in compounds like 工作.', 3],
+    ['Which character means "clear"?', ['清', '请', '情', '晴'], '清 qīng = clear (water radical); 请 qǐng = please (speech radical); 情 qíng = feeling.', 3],
+    ['Which character means "sunny"?', ['晴', '清', '请', '情'], '晴 qíng = sunny — the 日 (sun) radical gives it away.', 3],
+    ['Which character means "to enter"?', ['入', '人', '八', '几'], '入 rù = to enter; 人 rén = person. The stroke that sticks out on top differs.', 2],
+    ['Which character means "thousand"?', ['千', '干', '于', '午'], '千 qiān = thousand; 干 gān = dry. The top stroke of 千 slants.', 2],
+    ['Which character means "book" as in "root/origin"?', ['本', '木', '术', '未'], '本 běn = root, origin, measure word for books — 木 (tree) with a mark at the base.', 2]
+  ];
+
+  /* [question, [options — first is correct], explanation, band] */
   var GRAMMAR = [
-    ['Which measure word goes with 书 (book)?', ['本', '只', '杯', '张'], '一本书 — 本 is the measure word for bound volumes.', 2],
-    ['Which measure word goes with 猫 (cat)?', ['只', '本', '条', '位'], '一只猫 — 只 is used for many small animals.', 2],
+    ['Which word means "not" before most verbs?', ['不', '很', '的', '了'], '不 negates most verbs and adjectives; 没 is used with 有.', 1],
+    ['How do you say "my"?', ['我的', '我了', '我很', '我们'], '的 turns 我 (I) into 我的 (my).', 1],
+    ['Which word turns a statement into a yes/no question?', ['吗', '很', '的', '也'], '吗 is added at the very end: 你好吗？', 1],
+    ['Which is correct for "I am very happy"?', ['我很高兴', '很我高兴', '我高兴很', '高兴我很'], '很 comes between the subject and the adjective.', 1],
+    ['Which measure word goes with 书 (book)?', ['本', '只', '杯', '张'], '一本书 — 本 is used for bound volumes.', 2],
+    ['Which measure word goes with 猫 (cat)?', ['只', '本', '条', '位'], '一只猫 — 只 covers many small animals.', 2],
     ['Which measure word goes with 茶 (a cup of tea)?', ['杯', '本', '张', '件'], '一杯茶 — 杯 means "cup".', 2],
-    ['Which measure word goes with 桌子 (table)?', ['张', '本', '只', '双'], '一张桌子 — 张 is used for flat things.', 2],
-    ['The default measure word, used when you are unsure, is:', ['个', '本', '只', '条'], '个 (gè) works with a very wide range of nouns.', 1],
+    ['Which measure word goes with 桌子 (table)?', ['张', '本', '只', '双'], '一张桌子 — 张 is for flat things.', 2],
+    ['The default measure word, used when unsure, is:', ['个', '本', '只', '条'], '个 (gè) works with a very wide range of nouns.', 1],
     ['How do you turn 你是学生 into a yes/no question?', ['你是学生吗？', '你是学生呢？', '吗你是学生？', '你吗是学生？'], '吗 goes at the very end of the sentence.', 1],
     ['Which sentence correctly says "I don\'t have money"?', ['我没有钱', '我不有钱', '我不钱有', '我没钱不'], '有 is negated with 没, never with 不.', 2],
-    ['Where does the time word go in Chinese?', ['Before the verb: 我明天去', 'After the verb: 我去明天', 'At the very end always', 'It cannot appear in a sentence'], 'Chinese puts time expressions before the verb phrase.', 2],
-    ['What does 了 usually mark in 我吃了？', ['A completed action', 'A future action', 'A question', 'A negative'], '了 signals completion or a change of state.', 2],
-    ['Which is the correct word order for "I go to school by bus"?', ['我坐公共汽车去学校', '我去学校坐公共汽车', '我学校去坐公共汽车', '去我学校公共汽车坐'], 'The means of travel comes before the main verb 去.', 3],
+    ['Where does a time word go in a Chinese sentence?', ['Before the verb: 我明天去', 'After the verb: 我去明天', 'Always at the very end', 'It cannot appear'], 'Time expressions precede the verb phrase.', 2],
+    ['What does 了 mark in 我吃了?', ['A completed action', 'A future action', 'A question', 'A negative'], '了 signals completion or a change of state.', 2],
+    ['Which word order means "I go to school by bus"?', ['我坐公共汽车去学校', '我去学校坐公共汽车', '我学校去坐公共汽车', '去我学校坐公共汽车'], 'The means of travel comes before the main verb 去.', 3],
     ['What is the role of 的 in 我的书?', ['It marks possession', 'It marks the past', 'It asks a question', 'It negates the noun'], '我的书 = "my book".', 1],
     ['Which sentence means "He is also a teacher"?', ['他也是老师', '他是也老师', '也他是老师', '他是老师也'], '也 goes directly before the verb.', 2],
-    ['With an adjective like 高兴, what usually comes before it?', ['很', '是', '的', '了'], '很高兴 — 很 links a subject to an adjective; 是 is not used there.', 2],
+    ['With an adjective like 高兴, what usually comes before it?', ['很', '是', '的', '了'], '很高兴 — 是 is not used to link a subject to a plain adjective.', 2],
     ['Which question word asks "where"?', ['哪儿', '什么', '谁', '怎么'], '哪儿 (nǎr) or 哪里 (nǎlǐ) means "where".', 1],
     ['How do you say "I am not a student"?', ['我不是学生', '我没是学生', '我是不学生', '我不学生是'], '不 negates 是; 没 is used with 有 and completed actions.', 2],
     ['In 我比他高, what does 比 do?', ['It makes a comparison', 'It asks a question', 'It marks the past', 'It shows possession'], '我比他高 = "I am taller than him".', 3],
     ['Which is the correct way to say "two people"?', ['两个人', '二个人', '两人个', '个两人'], 'Before a measure word, "two" is 两, not 二.', 2],
     ['What does 呢 do at the end of 你呢？', ['Bounces the same question back', 'Makes a command', 'Negates the sentence', 'Marks the future'], '你呢？= "And you?"', 2],
-    ['Which sentence means "I want to drink tea"?', ['我想喝茶', '我喝想茶', '我茶想喝', '想我喝茶'], 'Modal verb 想 comes before the main verb 喝.', 2],
-    ['What is the difference between 会 and 能?', ['会 = a learned skill, 能 = physically able or permitted', 'They are identical', '会 = past, 能 = future', '会 is a noun, 能 is a verb'], '我会游泳 (I can swim — I learned) vs 我今天不能游泳 (I can\'t swim today).', 3]
+    ['What is the difference between 会 and 能?', ['会 = a learned skill, 能 = physically able or permitted', 'They are identical', '会 = past, 能 = future', '会 is a noun'], '我会游泳 (I learned to swim) vs 我今天不能游泳 (I can\'t swim today).', 3],
+    ['What is the difference between 了 and 过?', ['了 marks completion; 过 marks past experience', 'They are identical', '了 is formal, 过 is informal', '过 marks the future'], '我去了北京 (I went) vs 我去过北京 (I have been there at some point).', 3],
+    ['Which sentence uses 把 correctly?', ['我把作业写完了', '我写完把作业了', '把我作业写完了', '我把写完作业了'], '把 + object + verb + complement. The object jumps in front of the verb.', 3],
+    ['In 他跑得很快, what does 得 do?', ['It introduces a complement describing the verb', 'It marks possession', 'It marks the past tense', 'It makes a question'], '得 links a verb to a description of how it is done.', 3],
+    ['Which is correct for "a little bit cold"?', ['有点儿冷', '一点儿冷', '冷有点儿', '很有点冷'], '有点儿 + adjective is used for something mildly unwelcome; 一点儿 follows the adjective instead.', 3],
+    ['Where does 都 go in "We all like tea"?', ['我们都喜欢茶', '都我们喜欢茶', '我们喜欢都茶', '我们喜欢茶都'], '都 always precedes the verb, and follows what it refers to.', 3],
+    ['Which sentence correctly asks "Have you eaten?"', ['你吃饭了吗？', '你了吃饭吗？', '吗你吃饭了？', '你吃吗饭了？'], '了 attaches to the verb phrase; 吗 closes the sentence.', 2]
   ];
 
-  /* ---------------- numbers ---------------- */
+  /* ============================== numbers ============================== */
   var DIGITS_HAN = ['零', '一', '二', '三', '四', '五', '六', '七', '八', '九'];
   var DIGITS_PIN = ['líng', 'yī', 'èr', 'sān', 'sì', 'wǔ', 'liù', 'qī', 'bā', 'jiǔ'];
   var UNITS_HAN = ['', '十', '百', '千'];
   var UNITS_PIN = ['', 'shí', 'bǎi', 'qiān'];
 
-  function convert(n, digits, units, joiner) {
-    if (n === 0) return digits[0];
+  function convert4(n, digits, units, joiner) {
+    if (n === 0) return '';
     var str = String(n), len = str.length, out = [], gap = false;
     for (var i = 0; i < len; i++) {
       var d = +str.charAt(i), pos = len - 1 - i;
       if (d === 0) { gap = true; continue; }
       if (gap && out.length) out.push(digits[0]);
       gap = false;
-      // 10-19 are 十一, 十二 … not 一十一
-      if (!(d === 1 && pos === 1 && out.length === 0)) out.push(digits[d]);
+      if (!(d === 1 && pos === 1 && out.length === 0)) out.push(digits[d]);   // 十一, not 一十一
       if (units[pos]) out.push(units[pos]);
     }
     return out.join(joiner);
   }
-  function toHan(n) { return convert(n, DIGITS_HAN, UNITS_HAN, ''); }
-  function toPin(n) { return convert(n, DIGITS_PIN, UNITS_PIN, ' '); }
+
+  /* Handles 万 grouping, so numbers run well past 9,999. */
+  function convert(n, digits, units, joiner, wan) {
+    if (n === 0) return digits[0];
+    if (n < 10000) return convert4(n, digits, units, joiner);
+    var high = Math.floor(n / 10000), low = n % 10000;
+    var head = convert4(high, digits, units, joiner) + joiner + wan;
+    if (low === 0) return head;
+    // a gap of a whole thousand needs a spoken zero: 100,001 -> 十万零一
+    var bridge = low < 1000 ? joiner + digits[0] + joiner : joiner;
+    return head + bridge + convert4(low, digits, units, joiner);
+  }
+
+  function toHan(n) { return convert(n, DIGITS_HAN, UNITS_HAN, '', '万'); }
+  function toPin(n) { return convert(n, DIGITS_PIN, UNITS_PIN, ' ', 'wàn').replace(/\s+/g, ' ').trim(); }
 
   var NUMBER_RANGES = [
     [[1, 10]],
     [[1, 10], [11, 99]],
-    [[1, 10], [11, 99], [100, 999]],
-    [[11, 99], [100, 999], [1000, 9999]],
-    [[100, 999], [1000, 9999]]
+    [[11, 99], [100, 999]],
+    [[100, 999], [1000, 9999]],
+    [[1000, 9999], [10000, 999999]]
   ];
 
   function numbers(n, stage) {
-    var ranges = NUMBER_RANGES[stage == null ? 2 : stage];
-    var modes = (stage != null && stage === 0) ? ['read', 'han'] : ['han', 'read', 'pin'];
+    var idx = stage == null ? 2 : stage;
+    var ranges = NUMBER_RANGES[idx];
+    var modes = idx === 0 ? ['read', 'han'] : ['han', 'read', 'pin'];
     var out = [], seen = {}, guard = 0;
+
     while (out.length < n && guard++ < n * 30) {
       var mode = U.pick(modes);
       var r = U.pick(ranges);
@@ -2102,36 +2519,61 @@ window.StudyHub = window.StudyHub || {};
       seen[key] = true;
 
       var han = toHan(value), pin = toPin(value);
-      // distractors drawn from the same range, near the answer where the range allows
       var pool = [], used = {}, tries = 0;
       var spread = Math.max(3, Math.round(value * 0.25));
       while (pool.length < 6 && tries++ < 60) {
         var alt = value + U.int(-spread, spread);
-        if (alt < r[0]) alt = U.int(r[0], r[1]);
-        if (alt > r[1]) alt = U.int(r[0], r[1]);
+        if (alt < r[0] || alt > r[1]) alt = U.int(r[0], r[1]);
         if (alt === value || used[alt]) continue;
         used[alt] = true;
         pool.push(alt);
       }
 
       if (mode === 'han') {
-        out.push(U.choice('Write ' + value + ' in Chinese characters.', han, pool.map(toHan), {
-          kicker: 'numbers', explanation: value + ' = ' + han + ' (' + pin + ')'
+        out.push(U.choice('Write ' + value.toLocaleString('en-US') + ' in Chinese characters.', han, pool.map(toHan), {
+          kicker: 'numbers', explanation: value.toLocaleString('en-US') + ' = ' + han + ' (' + pin + ')'
         }));
       } else if (mode === 'read') {
-        out.push(U.choice('What number is 「' + han + '」?', value, pool, {
-          kicker: 'numbers', promptBig: true, explanation: han + ' = ' + value + ' (' + pin + ')'
-        }));
+        out.push(U.choice('What number is 「' + han + '」?', value.toLocaleString('en-US'),
+          pool.map(function (v) { return v.toLocaleString('en-US'); }), {
+            kicker: 'numbers', promptBig: true,
+            explanation: han + ' = ' + value.toLocaleString('en-US') + ' (' + pin + ')'
+          }));
       } else {
-        out.push(U.choice('How do you say ' + value + ' in pinyin?', pin, pool.map(toPin), {
-          kicker: 'numbers', explanation: value + ' = ' + han + ' (' + pin + ')'
+        out.push(U.choice('How do you say ' + value.toLocaleString('en-US') + ' in pinyin?', pin, pool.map(toPin), {
+          kicker: 'numbers', explanation: value.toLocaleString('en-US') + ' = ' + han + ' (' + pin + ')'
         }));
       }
     }
     return out;
   }
 
-  /* ---------------- vocabulary generators ---------------- */
+  /* ======================= distractor selection ======================= */
+
+  /* Words sharing a character with the target confuse far better than random ones. */
+  function sharesCharacter(bank, word) {
+    var chars = word[0].split('');
+    return bank.filter(function (x) {
+      if (x[0] === word[0]) return false;
+      return chars.some(function (c) { return x[0].indexOf(c) !== -1; });
+    });
+  }
+
+  function sameSound(bank, word) {
+    var base = stripTones(word[1]);
+    return bank.filter(function (x) { return x[0] !== word[0] && stripTones(x[1]) === base; });
+  }
+
+  /* Pinyin distractors: real homophones first, then tone variants of the answer. */
+  function pinyinDistractors(bank, word) {
+    var out = sameSound(bank, word).map(function (x) { return x[1]; });
+    toneVariants(word[1]).forEach(function (v) { if (out.indexOf(v) === -1) out.push(v); });
+    bank.forEach(function (x) { if (x[0] !== word[0]) out.push(x[1]); });   // last-resort filler
+    return out;
+  }
+
+  /* ============================= generators ============================= */
+
   function fromBank(fullBank, mode, kicker) {
     return function (n, stage) {
       var bank = U.forStage(fullBank, stage);
@@ -2140,21 +2582,26 @@ window.StudyHub = window.StudyHub || {};
         var m = mode === 'mixed' ? U.pick(['pinyin', 'meaning', 'toChinese']) : mode;
 
         if (m === 'pinyin') {
-          var pool = bank.filter(function (x) { return x[0] !== hanzi; }).map(function (x) { return x[1]; });
-          return U.choice('How is 「' + hanzi + '」 pronounced?', pinyin, pool, {
+          return U.choice('How is 「' + hanzi + '」 pronounced?', pinyin, pinyinDistractors(bank, w), {
             kicker: kicker + ' · pinyin', promptBig: true,
             explanation: hanzi + ' — ' + pinyin + ' — ' + english
           });
         }
+
         if (m === 'meaning') {
-          var pool2 = bank.filter(function (x) { return x[0] !== hanzi; }).map(function (x) { return x[2]; });
-          return U.choice('What does 「' + hanzi + '」 mean?', english, pool2, {
+          var near = sharesCharacter(bank, w).concat(sameSound(bank, w));
+          var pool = near.map(function (x) { return x[2]; });
+          bank.forEach(function (x) { if (x[0] !== hanzi) pool.push(x[2]); });
+          return U.choice('What does 「' + hanzi + '」 mean?', english, pool, {
             kicker: kicker + ' · meaning', promptBig: true,
             explanation: hanzi + ' (' + pinyin + ') means "' + english + '".'
           });
         }
-        var pool3 = bank.filter(function (x) { return x[0] !== hanzi; }).map(function (x) { return x[0]; });
-        return U.choice('Which characters mean "' + english + '"?', hanzi, pool3, {
+
+        var closest = sharesCharacter(bank, w).concat(sameSound(bank, w));
+        var words = closest.map(function (x) { return x[0]; });
+        bank.forEach(function (x) { if (x[0] !== hanzi) words.push(x[0]); });
+        return U.choice('Which is "' + english + '" in Chinese?', hanzi, words, {
           kicker: kicker + ' · English → Chinese',
           explanation: '"' + english + '" = ' + hanzi + ' (' + pinyin + ')'
         });
@@ -2162,16 +2609,45 @@ window.StudyHub = window.StudyHub || {};
     };
   }
 
-  function grammar(n, stage) {
-    return U.sample(U.forStage(GRAMMAR, stage), n).map(function (g) {
-      var correct = g[1][0];
-      var options = U.shuffle(g[1]);
-      return {
-        type: 'choice', kicker: 'grammar',
-        prompt: g[0], choices: options,
-        answer: options.indexOf(correct),
-        explanation: g[2]
-      };
+  /* Pure tone discrimination: every wrong answer is the right syllables, wrong tones. */
+  function tones(n, stage) {
+    var bank = U.forStage(VOCAB, stage).filter(function (w) { return toneVariants(w[1]).length >= 3; });
+    return U.sample(bank, n).map(function (w) {
+      return U.choice('Which is the correct tone marking for 「' + w[0] + '」?', w[1], toneVariants(w[1]), {
+        kicker: 'tones', promptBig: true,
+        explanation: w[0] + ' is ' + w[1] + ' — "' + w[2] + '". Tone changes meaning, so it is part of the word, not decoration.'
+      });
+    });
+  }
+
+  function bank4(items, kicker) {
+    return function (n, stage) {
+      return U.sample(U.forStage(items, stage), n).map(function (it) {
+        var correct = it[1][0];
+        var options = U.shuffle(it[1]);
+        return {
+          type: 'choice', kicker: kicker, prompt: it[0],
+          choices: options, answer: options.indexOf(correct), explanation: it[2]
+        };
+      });
+    };
+  }
+
+  function chengyu(n, stage) {
+    var pool = U.forStage(CHENGYU, stage);
+    return U.sample(pool, n).map(function (c) {
+      if (Math.random() < 0.5) {
+        var meanings = pool.filter(function (x) { return x[0] !== c[0]; }).map(function (x) { return x[2]; });
+        return U.choice('What does the idiom 「' + c[0] + '」 mean?', c[2], meanings, {
+          kicker: '成语', promptBig: true,
+          explanation: c[0] + ' (' + c[1] + ') — ' + c[2] + '.'
+        });
+      }
+      var forms = pool.filter(function (x) { return x[0] !== c[0]; }).map(function (x) { return x[0]; });
+      return U.choice('Which idiom means "' + c[2] + '"?', c[0], forms, {
+        kicker: '成语',
+        explanation: c[0] + ' (' + c[1] + ') — ' + c[2] + '.'
+      });
     });
   }
 
@@ -2189,14 +2665,309 @@ window.StudyHub = window.StudyHub || {};
     native: '中文',
     emoji: '🀄',
     color: 'var(--chinese)',
-    blurb: 'Characters, pinyin, numbers, phrases and sentence patterns.',
+    blurb: 'Characters, tones, sentence patterns, idioms and grammar.',
     topics: [
-      { id: 'pinyin', name: 'Characters → Pinyin', desc: 'Read the character, pick the pronunciation', generate: fromBank(VOCAB, 'pinyin', 'vocab'), flashcards: cards(VOCAB) },
-      { id: 'meaning', name: 'Characters → Meaning', desc: 'Read the character, pick the English', generate: fromBank(VOCAB, 'meaning', 'vocab'), flashcards: cards(VOCAB) },
-      { id: 'toChinese', name: 'English → Chinese', desc: 'Recall the characters from the English', generate: fromBank(VOCAB, 'toChinese', 'vocab'), flashcards: cards(VOCAB) },
-      { id: 'numbers', name: 'Numbers', desc: 'Read and write Chinese numbers', generate: numbers },
-      { id: 'phrases', name: 'Everyday Phrases', desc: 'Greetings, politeness and getting by', generate: fromBank(PHRASES, 'mixed', 'phrase'), flashcards: cards(PHRASES) },
-      { id: 'grammar', name: 'Grammar & Measure Words', desc: 'Word order, 的/了/吗, 不 vs 没, measure words', generate: grammar }
+      { id: 'pinyin', name: 'Characters → Pinyin', desc: 'Read the character, pick the exact pronunciation',
+        generate: fromBank(VOCAB, 'pinyin', 'vocab'), flashcards: cards(VOCAB) },
+      { id: 'tones', name: 'Tones', desc: 'Same syllables, different tones — pick the right one',
+        generate: tones, flashcards: cards(VOCAB) },
+      { id: 'meaning', name: 'Characters → Meaning', desc: 'Read the character, pick the English',
+        generate: fromBank(VOCAB, 'meaning', 'vocab'), flashcards: cards(VOCAB) },
+      { id: 'toChinese', name: 'English → Chinese', desc: 'Recall the characters from the English',
+        generate: fromBank(VOCAB, 'toChinese', 'vocab'), flashcards: cards(VOCAB) },
+      { id: 'confusable', name: 'Tricky Characters', desc: 'Look-alikes: 己/已, 买/卖, 那/哪',
+        generate: bank4(CONFUSABLE, 'look carefully') },
+      { id: 'sentences', name: 'Sentence Patterns', desc: '把, 被, 得, 越来越, 虽然…但是',
+        generate: bank4(SENTENCES, 'complete the sentence') },
+      { id: 'grammar', name: 'Grammar & Measure Words', desc: 'Word order, 了/过, 不 vs 没, measure words',
+        generate: bank4(GRAMMAR, 'grammar') },
+      { id: 'numbers', name: 'Numbers', desc: 'Read and write Chinese numbers, including 万',
+        generate: numbers },
+      { id: 'phrases', name: 'Everyday Phrases', desc: 'Greetings, politeness and getting by',
+        generate: fromBank(PHRASES, 'mixed', 'phrase'), flashcards: cards(PHRASES) },
+      { id: 'chengyu', name: 'Idioms 成语', desc: 'Four-character idioms and what they really mean',
+        minStage: 3, generate: chengyu, flashcards: cards(CHENGYU) }
+    ]
+  });
+
+  /* exposed for tools/verify-chinese.mjs */
+  SH._chinese = { toneVariants: toneVariants, stripTones: stripTones, toHan: toHan, toPin: toPin, VOCAB: VOCAB };
+})(window.StudyHub);
+</script>
+<script>
+/* Chess — pieces, rules, tactics, mating patterns, openings and endgames.
+   Bank items end with a difficulty band: 1 = ages 4–10, 2 = 11–13, 3 = 14+.
+   Puzzle positions are FEN strings; every one is checked by tools/verify-chess.mjs. */
+(function (SH) {
+  'use strict';
+  var U = SH.U;
+
+  /* [question, [options — first is correct], explanation, band] */
+  var PIECES = [
+    ['Which piece is worth about the same as three pawns?', ['A bishop', 'A rook', 'The queen', 'Another pawn'], 'Bishops and knights are both worth roughly three pawns.', 2],
+    ['From a central square on an empty board, a knight can reach how many squares?', ['8', '4', '6', '2'], 'On the rim that drops to four, and in the corner to just two.', 2],
+    ['In a closed position with locked pawn chains, which piece is usually stronger?', ['A knight', 'A bishop', 'A rook', 'The king'], 'Knights jump over the blockage; bishops get shut in behind their own pawns.', 3],
+    ['Why is the "bishop pair" considered an advantage?', ['Together the two bishops cover squares of both colours', 'Bishops can jump over pieces', 'Each is worth five pawns', 'They allow you to castle twice'], 'A single bishop is permanently blind to half the board.', 3],
+    ['What does winning "the exchange" mean?', ['Winning a rook for a bishop or knight', 'Trading queens', 'Any capture at all', 'Castling first'], 'It is worth roughly one and a half to two pawns.', 3],
+    ['Why does a knight lose value on the edge of the board?', ['It controls far fewer squares there', 'It cannot move backwards', 'It becomes pinned automatically', 'It loses its ability to jump'], 'Hence the old saying, "a knight on the rim is dim".', 3],
+    ['A bishop is at its best when...', ['Pawns are on both wings and the diagonals are open', 'The position is completely blocked', 'It sits in the corner', 'Its own pawns fix it in place'], 'Open lines are what give a bishop its long reach.', 3],
+    ['Two rooks, compared with a queen, are generally...', ['Slightly stronger in open positions', 'Far weaker in every position', 'Worth about three pawns', 'Unable to defend each other'], 'Two rooks total ten points against the queen\'s nine.', 3],
+    ['Which pieces are called the "minor pieces"?', ['Knights and bishops', 'Rooks and queens', 'Pawns and kings', 'Only the queen'], 'Rooks and queens are the "major" or "heavy" pieces.', 3],
+    ['How many squares are there on a chessboard?', ['64', '32', '81', '100'], 'Eight files by eight ranks makes 64 squares.', 1],
+    ['How does a rook move?', ['In straight lines along ranks and files', 'Diagonally only', 'One square at a time in any direction', 'In an L-shape'], 'Rooks travel any distance forwards, backwards or sideways.', 1],
+    ['How does a bishop move?', ['Diagonally, staying on one colour', 'Along ranks and files', 'In an L-shape', 'One square forward'], 'A bishop that starts on a light square stays on light squares all game.', 1],
+    ['How does a knight move?', ['Two squares one way, then one at a right angle', 'Three squares diagonally', 'Any distance diagonally', 'One square in any direction'], 'The knight is the only piece that jumps over others.', 1],
+    ['How does the queen move?', ['Any distance in a straight or diagonal line', 'Only diagonally', 'Only two squares at a time', 'In an L-shape'], 'The queen combines the rook and the bishop.', 1],
+    ['How far can the king move?', ['One square in any direction', 'Two squares in any direction', 'Any distance in a straight line', 'In an L-shape'], 'The king is slow, which is why it needs protecting.', 1],
+    ['How do pawns capture?', ['Diagonally forward, one square', 'Straight forward', 'Backwards', 'In an L-shape'], 'Pawns move straight ahead but capture on the diagonal.', 1],
+    ['Which piece can jump over other pieces?', ['The knight', 'The rook', 'The bishop', 'The queen'], 'Every other piece is blocked by anything in its path.', 1],
+    ['How many pieces does each player start with?', ['16', '8', '12', '20'], 'Eight pawns and eight other pieces each.', 1],
+    ['Which piece starts in the corner of the board?', ['The rook', 'The knight', 'The bishop', 'The queen'], 'Rooks occupy a1, h1, a8 and h8.', 1],
+    ['On its very first move, a pawn may...', ['Move one or two squares forward', 'Move three squares forward', 'Move backwards', 'Move diagonally'], 'After that first move, pawns only ever advance one square at a time.', 1],
+    ['Which piece is the most valuable?', ['The queen', 'The rook', 'The knight', 'The bishop'], 'The queen is worth about nine pawns — but the king is priceless.', 1],
+    ['A rook is worth about how many pawns?', ['5', '2', '9', '3'], 'Standard values: pawn 1, knight 3, bishop 3, rook 5, queen 9.', 2],
+    ['A knight and a bishop are each worth about...', ['3 pawns', '5 pawns', '1 pawn', '9 pawns'], 'They are roughly equal; bishops prefer open positions, knights closed ones.', 2],
+    ['At the start, the white queen stands on...', ['A light square, d1', 'A dark square, d1', 'A light square, e1', 'A dark square, e1'], 'Remember "queen on her own colour" — the white queen starts light.', 2],
+    ['The square h1 is what colour?', ['Light', 'Dark', 'It varies', 'Green'], 'Set the board up "light on the right".', 2],
+    ['Which pieces stand either side of the king at the start?', ['The queen and a bishop', 'Two knights', 'Two rooks', 'Two pawns'], 'From a1: rook, knight, bishop, queen, king, bishop, knight, rook.', 2],
+    ['Which is generally stronger in a wide-open position?', ['A bishop', 'A knight', 'They are always equal', 'A pawn'], 'Bishops like long open diagonals; knights prefer blocked positions.', 3]
+  ];
+
+  var RULES = [
+    ['If your king is in check, you must...', ['Deal with the check straight away', 'Ignore it if you prefer', 'Move a pawn', 'Offer a draw'], 'You can move the king, block the line, or capture the attacker.', 1],
+    ['Can you actually capture the king to win?', ['No — the game ends at checkmate', 'Yes, always', 'Only with the queen', 'Only in the endgame'], 'A player must never leave their king in check, so it is never captured.', 1],
+    ['How many kings does each player have?', ['One', 'Two', 'Eight', 'None'], 'Losing your only king by checkmate ends the game.', 1],
+    ['Castling queenside moves the king from e1 to...', ['c1', 'b1', 'd1', 'g1'], 'The king always travels exactly two squares; the rook lands beside it on d1.', 3],
+    ['A draw by "insufficient material" happens when...', ['Neither side has enough pieces to force mate', 'Both players agree to stop', 'One player runs out of time', 'The same position repeats'], 'King versus king, or king and bishop versus king, are the common cases.', 3],
+    ['If a player runs out of time but the opponent could never checkmate, the result is...', ['A draw', 'A win for the opponent', 'A win on time', 'A replay'], 'You cannot win on time without the material to mate.', 3],
+    ['What is it called when a king is attacked?', ['Check', 'Checkmate', 'Stalemate', 'Castling'], 'In check you must get out of it immediately.', 1],
+    ['What happens when a pawn reaches the far end of the board?', ['It promotes, usually to a queen', 'It is removed', 'It becomes a king', 'Nothing at all'], 'A pawn may become a queen, rook, bishop or knight — never a king.', 1],
+    ['How do you win a game of chess?', ['By checkmating the opponent\'s king', 'By taking every pawn', 'By reaching the other side first', 'By taking the queen'], 'Checkmate means the king is attacked and has no legal escape.', 1],
+    ['Who moves first?', ['White', 'Black', 'The younger player', 'It is decided by a dice roll'], 'White always has the first move.', 1],
+    ['Can you ever move your king next to the opponent\'s king?', ['No, kings must never touch', 'Yes, at any time', 'Only when castling', 'Only in the endgame'], 'That would move your king into check, which is illegal.', 1],
+    ['What is castling?', ['The king moves two squares toward a rook and the rook hops over it', 'Swapping the king and queen', 'Moving the rook two squares', 'Promoting a pawn'], 'It is the only move where two of your pieces move at once.', 2],
+    ['When are you NOT allowed to castle?', ['Out of, through, or into check', 'When you have both rooks', 'On the kingside only', 'After ten moves'], 'You also cannot castle if the king or that rook has already moved.', 2],
+    ['What is stalemate?', ['A player has no legal move but is not in check — the game is drawn', 'A checkmate in one move', 'A repeated position', 'A pawn reaching the eighth rank'], 'Stalemate saves many lost positions, so watch for it when winning.', 2],
+    ['What does the symbol "+" mean in chess notation?', ['Check', 'Checkmate', 'A good move', 'A capture'], '"#" (or "++") means checkmate.', 2],
+    ['What does "Nf3" mean?', ['The knight moves to f3', 'A pawn moves to f3', 'The king moves to f3', 'A knight is captured on f3'], 'N is the knight, because K is already taken by the king.', 2],
+    ['What does "O-O" mean?', ['Castling kingside', 'Castling queenside', 'A draw offer', 'A double check'], 'Queenside castling — the longer one — is written O-O-O.', 2],
+    ['What does "exd5" mean?', ['A pawn on the e-file captures on d5', 'The king moves to d5', 'A pawn moves to e5', 'A bishop captures on d5'], 'Pawn captures are written with the file the pawn came from.', 2],
+    ['Which square is in the bottom-left corner from White\'s side?', ['a1', 'h1', 'a8', 'e1'], 'Files run a–h left to right; ranks run 1–8 away from White.', 2],
+    ['What is "en passant"?', ['Capturing a pawn that just passed your pawn with a double step', 'Castling on the queenside', 'Promoting to a knight', 'Offering a draw'], 'It can only be played on the very next move, or the right is lost.', 3],
+    ['A position repeating three times means...', ['Either player may claim a draw', 'The game is a win for White', 'The moves must be replayed', 'Nothing at all'], 'Threefold repetition is one of several drawing rules.', 3],
+    ['What is the fifty-move rule?', ['A draw may be claimed after 50 moves with no capture and no pawn move', 'The game ends after exactly 50 moves', 'Each player gets 50 minutes', 'A pawn must move every 50 turns'], 'It stops endless shuffling in positions with no progress.', 3],
+    ['If you touch a piece in a serious game, you must...', ['Move it, if it has a legal move', 'Pass your turn', 'Give it to your opponent', 'Restart the game'], 'The touch-move rule; say "j\'adoube" first if you only mean to adjust.', 3],
+    ['Can a pawn promote to a second queen while you still have your first?', ['Yes', 'No, only one queen is allowed', 'Only if the first is captured', 'Only in the endgame'], 'You may have as many queens as you can promote pawns.', 3]
+  ];
+
+  var TACTICS = [
+    ['If one of your pieces is attacked and cannot be defended, you should usually...', ['Move it somewhere safe', 'Leave it where it is', 'Move your king instead', 'Offer a draw'], 'Losing material for nothing is the most common way beginners lose games.', 1],
+    ['Before each move, the most useful question is...', ['What did my opponent\'s last move threaten?', 'How long has the game lasted?', 'Which piece looks nicest?', 'How many pieces are left?'], 'Most blunders come from answering your own plan and ignoring theirs.', 1],
+    ['Which is worth more, a knight or a pawn?', ['The knight', 'The pawn', 'They are exactly equal', 'Neither has any value'], 'A knight is worth about three pawns.', 1],
+    ['If a pawn attacks your queen, you should usually...', ['Move the queen to safety', 'Ignore it', 'Take the pawn with the queen', 'Castle immediately'], 'Trading a nine-point queen for a one-point pawn is a disaster.', 1],
+    ['Taking a piece for free is good because...', ['Extra material usually decides the game', 'It looks impressive', 'It ends the game at once', 'It gives you more time'], 'Material advantage is the simplest path to winning.', 1],
+    ['A "desperado" is a piece that...', ['Is lost anyway, so it sells itself as dearly as possible', 'Never moves from its square', 'Only defends the king', 'Cannot be captured'], 'Grab whatever you can with a piece that is doomed regardless.', 3],
+    ['An in-between move (zwischenzug) is...', ['A surprising move inserted before the expected recapture', 'A move played twice in a row', 'Castling in the middlegame', 'Any pawn push'], 'It often changes the whole evaluation of a sequence.', 3],
+    ['What is interference?', ['Cutting the line between a defender and the thing it guards', 'Attacking two pieces at once', 'Trading off queens', 'Promoting a pawn'], 'A piece is often sacrificed onto the critical square to do it.', 3],
+    ['What is a fork?', ['One piece attacking two or more enemy pieces at once', 'Two pawns side by side', 'Trapping the king in the corner', 'Castling on the queenside'], 'Knights are the classic forking piece because their attacks are hard to see.', 1],
+    ['Which piece is famous for forking two pieces at once?', ['The knight', 'The pawn', 'The king', 'The rook'], 'A knight fork on king and queen wins material immediately.', 1],
+    ['If your opponent leaves a piece undefended, you should...', ['Look for a way to win it safely', 'Ignore it', 'Offer a draw', 'Move your king'], 'Undefended pieces are what most tactics target.', 1],
+    ['What is a pin?', ['A piece cannot move because a more valuable one sits behind it', 'A piece attacking two things at once', 'A pawn blocked by another pawn', 'A king with no moves'], 'A pin against the king is absolute: the pinned piece legally cannot move.', 2],
+    ['What is a skewer?', ['A valuable piece is attacked and a piece behind it is won when it moves', 'Two pawns defending each other', 'A knight attacking two pieces', 'Castling into safety'], 'A skewer is a pin turned around: the big piece is in front.', 2],
+    ['What is a discovered attack?', ['Moving one piece uncovers an attack from another', 'Attacking with the queen twice', 'Promoting a pawn', 'Trapping a bishop'], 'The moving piece can also make a threat of its own, which makes it very strong.', 2],
+    ['What is a back-rank mate?', ['A rook or queen mates a king trapped behind its own pawns', 'Mate delivered by a pawn', 'Mate in the centre of the board', 'A draw by repetition'], 'Giving your king "luft" — an escape square — prevents it.', 2],
+    ['Why is double check so dangerous?', ['The king must move, because you cannot block or capture two checkers', 'It wins the queen automatically', 'It ends the game instantly', 'It cannot be answered at all'], 'That forcing quality powers many combinations.', 3],
+    ['What is deflection?', ['Forcing a defending piece away from what it guards', 'Attacking with two pawns', 'Moving the king to safety', 'Trading queens'], 'Also called "removing the defender".', 3],
+    ['What is zugzwang?', ['Any move a player makes worsens their position', 'A double attack by a knight', 'A drawn endgame', 'A pawn on the seventh rank'], 'It decides many king-and-pawn endings.', 3],
+    ['An "overloaded" piece is one that...', ['Has too many defensive jobs to do at once', 'Has moved too many times', 'Is worth more than nine pawns', 'Is pinned to the king'], 'Attack one of its duties and the other collapses.', 3],
+    ['Before grabbing a free pawn you should ask...', ['Whether it is a trap that costs time or material', 'Whether it is your favourite colour', 'How many moves the game has lasted', 'Whether you can castle first'], 'Poisoned pawns have lost a great many games.', 3]
+  ];
+
+  var MATES = [
+    ['If a king is attacked but can move to a safe square, that is...', ['Check, not checkmate', 'Checkmate', 'Stalemate', 'A draw'], 'Mate only happens when there is no legal escape at all.', 1],
+    ['Checkmate ends the game...', ['Immediately', 'After ten more moves', 'Only if both players agree', 'Never'], 'Nothing is played after mate.', 1],
+    ['Which piece delivers checkmate most often?', ['The queen', 'A pawn', 'The king', 'A knight'], 'Her range lets her attack the king and cover escape squares at once.', 1],
+    ['To checkmate, you usually need to...', ['Attack the king and cover every escape square', 'Capture all the pawns first', 'Promote a pawn first', 'Castle first'], 'An attack the king can walk away from is only a check.', 1],
+    ['Can a king be checkmated in the middle of the board?', ['Yes, if every escape square is covered', 'No, never', 'Only by a pawn', 'Only on the first move'], 'It is rarer, because a central king has eight squares to cover.', 1],
+    ['A checkmated king...', ['Cannot escape, block, or capture the attacker', 'Is taken off the board', 'May move twice', 'Can castle out of it'], 'Those three answers to a check are exactly what mate rules out.', 1],
+    ['Which is easier to mate with: king and queen, or king and knight?', ['King and queen', 'King and knight', 'They are equally easy', 'Neither can mate'], 'King and knight cannot force mate at all.', 2],
+    ['Anastasia\'s mate is delivered by which pair of pieces?', ['A knight and a rook', 'Two bishops', 'Two pawns', 'The king and queen'], 'The knight covers the escape squares while the rook mates on the h-file.', 3],
+    ['In a smothered mate, the queen is usually sacrificed in order to...', ['Force the king\'s own rook onto its last escape square', 'Win a pawn', 'Promote', 'Deliver two checks'], 'The famous finish is Qg8+ Rxg8 Nf7#.', 3],
+    ['Boden\'s mate is delivered by...', ['Two bishops on criss-crossing diagonals', 'Two knights', 'A rook and a pawn', 'The king alone'], 'It usually strikes a king that has castled queenside.', 3],
+    ['The back-rank weakness is best prevented by...', ['Making "luft" — a square for the king to step into', 'Castling queenside instead', 'Trading queens early', 'Advancing the a-pawn'], 'One quiet pawn move can save the game later.', 3],
+    ['To mate with king and rook you should...', ['Use your king to take squares away while the rook cuts the enemy king off', 'Give checks at random', 'Keep the rook as far away as possible', 'Promote another pawn first'], 'The technique is called the box or the shrinking rectangle.', 3],
+    ['What is checkmate?', ['The king is attacked and has no legal way out', 'The king is captured and removed', 'A player runs out of pieces', 'A player runs out of time'], 'The king is never actually taken — the game ends at mate.', 1],
+    ['Can a lone king ever be checkmated by a lone king?', ['No', 'Yes', 'Only in the corner', 'Only with a pawn'], 'You need enough material to force mate.', 1],
+    ['Which single piece plus a king can force checkmate?', ['A rook', 'A knight', 'A bishop', 'None of them'], 'King and queen or king and rook can force mate; a lone bishop or knight cannot.', 2],
+    ['King and bishop against a lone king is...', ['A draw — mate cannot be forced', 'A win for the bishop', 'A win for the lone king', 'Illegal'], 'The same is true of king and knight against king.', 2],
+    ['What is the fastest possible checkmate?', ['Fool\'s mate, in two moves', 'Scholar\'s mate, in four moves', 'In seven moves', 'In ten moves'], 'It needs terrible cooperation: 1.f3 e5 2.g4 Qh4#.', 2],
+    ['Scholar\'s mate finishes with...', ['Qxf7#, supported by a bishop on c4', 'A knight on f7', 'A rook on the back rank', 'A pawn promotion'], 'f7 is the weakest square in the opening because only the king defends it.', 2],
+    ['What is a smothered mate?', ['A knight mates a king hemmed in by its own pieces', 'A mate by two rooks', 'A mate with pawns only', 'A stalemate'], 'Usually the queen is sacrificed to force the king\'s own rook into the corner square.', 3],
+    ['Two rooks mate a lone king by...', ['Cutting off ranks one at a time, like a staircase', 'Checking from the same file', 'Trapping it in the centre', 'Waiting for zugzwang'], 'The "ladder" or "lawnmower" mate needs no king help at all.', 3],
+    ['To mate with king and queen, you should...', ['Push the king to the edge, keeping your king close', 'Give endless checks in the centre', 'Keep the queen far away', 'Trade the queen off'], 'Beware stalemate: leave the enemy king a square until you can mate.', 3]
+  ];
+
+  var OPENINGS = [
+    ['What does "developing a piece" mean?', ['Bringing it out to a useful square', 'Trading it off', 'Promoting it', 'Losing it deliberately'], 'Pieces on their starting squares are doing nothing.', 1],
+    ['Which of these is a central square?', ['e4', 'a1', 'h8', 'a8'], 'The four central squares are d4, e4, d5 and e5.', 1],
+    ['A knight is usually best developed towards...', ['The centre', 'The edge of the board', 'Its own back rank', 'The corner'], 'From the centre a knight attacks eight squares; from the rim, four.', 1],
+    ['Should you push lots of pawns in the opening?', ['No — develop your pieces instead', 'Yes, push them all', 'Only the a-pawn', 'Only on the first move'], 'Every pawn move is a move your pieces did not make.', 1],
+    ['Where is the king safest in the opening?', ['Castled behind its own pawns', 'In the centre of the board', 'On an open file', 'On the eighth rank'], 'The centre is exactly where the lines open first.', 1],
+    ['1.e4 c6 is the...', ['Caro-Kann Defence', 'French Defence', 'Sicilian Defence', 'Scandinavian Defence'], 'Black prepares d5 without shutting in the light-squared bishop.', 3],
+    ['1.d4 Nf6 2.c4 g6 leads to the...', ['King\'s Indian Defence', 'Queen\'s Gambit Declined', 'Ruy Lopez', 'Italian Game'], 'Black gives up the centre early, then strikes back at it.', 3],
+    ['The Scandinavian Defence begins with...', ['1.e4 d5', '1.d4 d5', '1.e4 e5', '1.c4 e5'], 'Black challenges the e-pawn on the very first move.', 3],
+    ['An isolated queen\'s pawn is...', ['A pawn with no friendly pawns on either adjacent file', 'A pawn on the edge of the board', 'Two pawns on one file', 'A pawn that cannot be stopped'], 'It is weak in the endgame but grants active piece play earlier.', 3],
+    ['In the opening you should try to control...', ['The centre', 'The corners', 'The a-file', 'Your own back rank'], 'Central pieces reach more squares and move faster.', 1],
+    ['A good first move for White is...', ['e4 or d4', 'a4 or h4', 'Na3', 'f3'], 'Both stake a claim in the centre and open lines for pieces.', 1],
+    ['Early in the game you should get your king...', ['Castled and safe', 'Into the centre', 'Onto an open file', 'In front of the pawns'], 'Castling tucks the king away and connects the rooks.', 1],
+    ['In the opening it is usually best to...', ['Develop a new piece each move', 'Move the same piece repeatedly', 'Bring the queen out immediately', 'Push every pawn'], 'Time — "tempo" — is the currency of the opening.', 2],
+    ['Why is bringing the queen out very early usually bad?', ['It gets chased around, losing time', 'The queen is too weak', 'It is against the rules', 'It blocks your king'], 'Every attack on her develops an opponent piece for free.', 2],
+    ['1.e4 e5 2.Nf3 Nc6 3.Bb5 is the...', ['Ruy Lopez', 'Sicilian Defence', 'French Defence', 'Queen\'s Gambit'], 'Also called the Spanish Opening — one of the oldest and deepest.', 2],
+    ['1.e4 c5 is the...', ['Sicilian Defence', 'French Defence', 'Caro-Kann', 'Italian Game'], 'The most popular answer to 1.e4 at every level.', 2],
+    ['1.d4 d5 2.c4 is the...', ['Queen\'s Gambit', 'King\'s Indian', 'Ruy Lopez', 'Scotch Game'], 'White offers a pawn to deflect Black\'s d-pawn from the centre.', 2],
+    ['1.e4 e6 is the...', ['French Defence', 'Caro-Kann Defence', 'Sicilian Defence', 'Pirc Defence'], 'Black prepares d5 with a solid but slightly cramped structure.', 3],
+    ['What is a gambit?', ['Offering material, usually a pawn, for speed or attack', 'A forced checkmate', 'A drawn opening', 'A double check'], 'The Queen\'s Gambit and King\'s Gambit are the best-known examples.', 3],
+    ['What is a fianchetto?', ['Developing a bishop to b2, g2, b7 or g7 behind a knight-pawn', 'Castling queenside', 'Doubling rooks', 'Trading both bishops'], 'It aims the bishop along the board\'s longest diagonal.', 3],
+    ['A common piece of opening advice is to develop...', ['Knights before bishops', 'Rooks before knights', 'The queen before everything', 'Only pawns for ten moves'], 'A knight\'s best square is usually obvious; a bishop\'s often is not.', 3]
+  ];
+
+  var ENDGAMES = [
+    ['Why is a single extra pawn often enough to win an endgame?', ['It can be promoted into a queen', 'It blocks the enemy king', 'It is worth five points', 'It ends the game at once'], 'With few pieces left, there is little to stop it marching down the board.', 1],
+    ['In the endgame there are...', ['Few pieces left on the board', 'More pieces than at the start', 'No kings', 'Only queens'], 'With the queens gone, the rules of thumb change completely.', 1],
+    ['Which pawn is closest to promoting?', ['One on the seventh rank', 'One on the second rank', 'One on the first rank', 'One in the centre'], 'From the seventh, it promotes on the very next move.', 1],
+    ['If only the two kings are left, the game is...', ['A draw', 'A win for White', 'A win for Black', 'Played on forever'], 'Neither side has the material to mate.', 1],
+    ['Which piece is it usually best to promote to?', ['A queen', 'Another pawn', 'A king', 'Almost always a knight'], 'Underpromotion to a knight is occasionally right, but rarely.', 1],
+    ['To stop an enemy passed pawn, your king should try to...', ['Get in front of it', 'Stay behind it', 'Stay in the corner', 'Ignore it and attack elsewhere'], 'A king in front of a pawn blocks it completely.', 1],
+    ['In a king-and-pawn endgame, the most important factor is usually...', ['King activity', 'How many moves have been played', 'The colour of the squares', 'Castling rights'], 'An active king is worth more than an extra pawn in many endings.', 2],
+    ['The Lucena position is a winning method using...', ['A rook and a pawn on the seventh, "building a bridge"', 'Two knights', 'The bishop pair', 'Three connected pawns'], 'The rook shields its king from checks so the pawn can promote.', 3],
+    ['In the Philidor position the defender draws by...', ['Holding the rook on the third rank until the pawn advances', 'Giving up the rook for the pawn', 'Marching the king forward', 'Trading all the pawns'], 'Once the pawn comes to the sixth, the rook swings behind for checks.', 3],
+    ['Bishops of opposite colours in an endgame tend to...', ['Make a draw more likely, even a pawn or two down', 'Guarantee a win for the stronger side', 'Force checkmate quickly', 'Lose for whoever has them'], 'Neither bishop can ever challenge the other\'s squares.', 3],
+    ['The "wrong rook pawn" draw happens when the bishop...', ['Does not control the pawn\'s promotion square', 'Is pinned to the king', 'Sits on the wrong file', 'Has already been captured'], 'The defending king simply sits in the corner and cannot be shifted.', 3],
+    ['In the endgame, the king should...', ['Come out and fight — it is a strong piece', 'Hide in the corner', 'Stay behind its pawns forever', 'Be traded off'], 'With few pieces left, the king is worth about four pawns in attacking power.', 1],
+    ['A pawn that reaches the eighth rank usually becomes...', ['A queen', 'A king', 'A second pawn', 'Nothing'], 'Promotion is why even a single extra pawn can win a game.', 1],
+    ['A "passed pawn" is one that...', ['Has no enemy pawn able to stop it', 'Has moved twice', 'Sits on the edge of the board', 'Is defended by a rook'], 'Passed pawns must be pushed — they only get stronger.', 2],
+    ['King and rook against a lone king is...', ['A forced win', 'A draw', 'A loss', 'Only a win with a pawn'], 'You drive the king to the edge with the rook and your own king.', 2],
+    ['What is the "opposition"?', ['Kings facing each other with one square between; the player to move must give way', 'Two rooks on one file', 'A pawn blocked by a pawn', 'Castling on opposite sides'], 'Whoever does NOT have to move holds the opposition and makes progress.', 2],
+    ['Where does a rook usually belong relative to a passed pawn?', ['Behind it', 'In front of it', 'Beside it', 'On the other side of the board'], 'Tarrasch\'s rule: the rook gains scope as the pawn advances.', 3],
+    ['What is the "rule of the square"?', ['A way to see at a glance whether a king can catch a passed pawn', 'A rule about castling', 'A method of counting material', 'A way to set up the board'], 'Draw a square from the pawn to the promotion rank; if the king can step inside, it catches the pawn.', 3],
+    ['In king-and-pawn endings, having an extra tempo often means...', ['Winning, because the opponent is in zugzwang', 'Nothing at all', 'An automatic draw', 'Losing a pawn'], 'These endings are decided by single moves more than any other.', 3],
+    ['Two knights against a lone king can...', ['Not force checkmate', 'Force mate in under ten moves', 'Force mate easily', 'Only stalemate'], 'Mate is possible but cannot be forced against best defence.', 3]
+  ];
+
+  /* Board puzzles. `moves` lists [notation, from-to]; the first entry is the answer.
+     Each is verified by tools/verify-chess.mjs, which generates legal moves from the FEN. */
+  var PUZZLES = [
+    { fen: '4k3/8/8/3q4/8/1B6/8/4K3 w - - 0 1', band: 1, static: true,
+      ask: 'Which white piece can capture the black queen?',
+      options: ['The bishop, along the b3–c4–d5 diagonal',
+                'The king, by walking up the board',
+                'A pawn, by capturing forwards',
+                'No white piece can reach it'],
+      why: 'Bishops move diagonally. From b3 the path runs b3–c4–d5, and d5 is exactly where the queen stands.' },
+
+    { fen: '4k3/8/8/8/7r/8/8/4K2R w - - 0 1', band: 1,
+      ask: 'White to play. Black has left a rook undefended — take it.',
+      moves: [['Rxh4', 'h1h4'], ['Rh3', 'h1h3'], ['Rg1', 'h1g1'], ['Kf2', 'e1f2']],
+      why: 'The rooks share the h-file with nothing in between, so Rxh4 simply wins a whole rook for free.' },
+
+    { fen: '6k1/5ppp/8/8/8/8/8/3R2K1 w - - 0 1', band: 2,
+      ask: 'White to play. Find checkmate in one move.',
+      moves: [['Rd8#', 'd1d8'], ['Rd7', 'd1d7'], ['Rd4', 'd1d4'], ['Kf2', 'g1f2']],
+      why: 'Rd8 is mate on the back rank: the king is walled in by its own pawns on f7, g7 and h7.' },
+
+    { fen: '7k/8/5K2/8/8/8/8/6Q1 w - - 0 1', band: 2,
+      ask: 'White to play. Find checkmate in one move.',
+      moves: [['Qg7#', 'g1g7'], ['Qg8+', 'g1g8'], ['Qh1+', 'g1h1'], ['Qb6', 'g1b6']],
+      why: 'Qg7 is protected by the king on f6, so the black king can neither capture it nor escape. Qg8+ fails because the queen is undefended there — the king just takes it.' },
+
+    { fen: '7k/8/7K/8/8/8/8/R7 w - - 0 1', band: 2,
+      ask: 'White to play. Find checkmate in one move.',
+      moves: [['Ra8#', 'a1a8'], ['Ra7', 'a1a7'], ['Rh1+', 'a1h1'], ['Kg6', 'h6g6']],
+      why: 'The rook takes the eighth rank while the white king covers g7 and h7. This is the basic king-and-rook mate.' },
+
+    { fen: 'r1bqkb1r/pppp1ppp/2n2n2/4p2Q/2B1P3/8/PPPP1PPP/RNB1K1NR w KQkq - 4 4', band: 2,
+      ask: 'White to play. This is Scholar\'s mate — finish it.',
+      moves: [['Qxf7#', 'h5f7'], ['Qxe5+', 'h5e5'], ['Bxf7+', 'c4f7'], ['Qf3', 'h5f3']],
+      why: 'Qxf7 is mate because the bishop on c4 defends the queen. Bxf7+ is only a check — the king simply takes the bishop.' },
+
+    { fen: 'r3k3/8/8/3N4/8/8/8/4K3 w - - 0 1', band: 2,
+      ask: 'White to play. Win the rook with a knight fork.',
+      moves: [['Nc7+', 'd5c7'], ['Nf6+', 'd5f6'], ['Nb6', 'd5b6'], ['Ne3', 'd5e3']],
+      why: 'Nc7 checks the king on e8 and attacks the rook on a8 at the same time. The king must move, and the rook falls.' },
+
+    { fen: '3q4/8/8/3k4/8/8/8/R3K3 w - - 0 1', band: 3,
+      ask: 'White to play. Win the queen with a skewer.',
+      moves: [['Rd1+', 'a1d1'], ['Ra5+', 'a1a5'], ['Ra8', 'a1a8'], ['Ke2', 'e1e2']],
+      why: 'Rd1 checks the king along the d-file. When the king steps aside, Rxd8 wins the queen behind it. Ra5+ is also check, but nothing stands behind the king.' },
+
+    { fen: '4k3/8/2n5/1B6/8/8/8/4K3 w - - 0 1', band: 2, static: true,
+      ask: 'Which black piece is pinned, and why?',
+      options: ['The knight on c6 — moving it would expose the king on e8',
+                'The king on e8 — it cannot move at all',
+                'Nothing is pinned in this position',
+                'The bishop on b5 is pinned'],
+      why: 'The bishop on b5 attacks along b5–c6–d7–e8. The knight is stuck: moving it would leave the king in check, which is illegal.' }
+  ];
+
+  /* ---------------- generators ---------------- */
+
+  function bank(items, kicker) {
+    return function (n, stage) {
+      return U.sample(U.forStage(items, stage), n).map(function (it) {
+        var correct = it[1][0];
+        var options = U.shuffle(it[1]);
+        return {
+          type: 'choice', kicker: kicker,
+          prompt: it[0], choices: options,
+          answer: options.indexOf(correct), explanation: it[2]
+        };
+      });
+    };
+  }
+
+  function puzzleQuestion(p) {
+    if (p.static) {
+      var opts = U.shuffle(p.options);
+      return {
+        type: 'choice', kicker: 'position', board: p.fen,
+        prompt: p.ask, choices: opts,
+        answer: opts.indexOf(p.options[0]), explanation: p.why
+      };
+    }
+    var correct = p.moves[0][0];
+    var choices = U.shuffle(p.moves.map(function (m) { return m[0]; }));
+    return {
+      type: 'choice', kicker: 'find the move', board: p.fen,
+      prompt: p.ask, choices: choices,
+      answer: choices.indexOf(correct), explanation: p.why
+    };
+  }
+
+  /* Puzzles are few, so a puzzle lesson mixes them with related theory. */
+  function puzzles(n, stage) {
+    var pool = U.forStage(PUZZLES.map(function (p) { return [p, p.band]; }), stage)
+                .map(function (x) { return x[0]; });
+    var out = U.shuffle(pool).map(puzzleQuestion);
+    if (out.length >= n) return out.slice(0, n);
+    var theory = bank(MATES.concat(TACTICS), 'tactics')(n - out.length, stage);
+    return U.shuffle(out.concat(theory));
+  }
+
+  SH.register({
+    id: 'chess',
+    name: 'Chess',
+    native: '',
+    emoji: '♟️',
+    color: 'var(--chess)',
+    blurb: 'Pieces, rules, tactics, mating patterns, openings and endgames.',
+    topics: [
+      { id: 'pieces', name: 'The Pieces', desc: 'How everything moves, and what it is worth', generate: bank(PIECES, 'the pieces') },
+      { id: 'rules', name: 'Rules & Notation', desc: 'Castling, promotion, stalemate, reading moves', generate: bank(RULES, 'rules') },
+      { id: 'tactics', name: 'Tactics', desc: 'Forks, pins, skewers and discovered attacks', generate: bank(TACTICS, 'tactics') },
+      { id: 'puzzles', name: 'Board Puzzles', desc: 'Real positions — find the winning move', generate: puzzles },
+      { id: 'mates', name: 'Checkmate Patterns', desc: 'Back rank, smothered, and forcing mate with few pieces', generate: bank(MATES, 'checkmate') },
+      { id: 'openings', name: 'Openings', desc: 'Opening principles and the named classics', generate: bank(OPENINGS, 'openings') },
+      { id: 'endgames', name: 'Endgames', desc: 'Opposition, passed pawns and basic wins', generate: bank(ENDGAMES, 'endgames') }
     ]
   });
 })(window.StudyHub);
@@ -2218,6 +2989,53 @@ window.StudyHub = window.StudyHub || {};
     return String(s).trim().toLowerCase().replace(/\s+/g, ' ').replace(/[.,!?;:]+$/, '');
   }
   function isCjk(s) { return /[㐀-鿿]/.test(s); }
+  function sfx(name) { if (SH.Sfx) SH.Sfx.play(name); }
+
+  /* Draw a position from a FEN string. Filled glyphs are used for both sides and
+     coloured with CSS, because outline glyphs render inconsistently across fonts. */
+  var GLYPH = { k: '\u265A', q: '\u265B', r: '\u265C', b: '\u265D', n: '\u265E', p: '\u265F' };
+  var PIECE_NAME = { k: 'king', q: 'queen', r: 'rook', b: 'bishop', n: 'knight', p: 'pawn' };
+
+  function renderBoard(fen) {
+    var rows = fen.split(' ')[0].split('/');
+    var wrap = el('div', 'board-wrap');
+    var grid = el('div', 'board');
+
+    for (var r = 0; r < 8; r++) {
+      var file = 0;
+      var chars = rows[r].split('');
+      for (var c = 0; c < chars.length; c++) {
+        var ch = chars[c];
+        if (/\d/.test(ch)) {
+          for (var k = 0; k < +ch; k++) { grid.appendChild(square(file, r, null)); file++; }
+        } else {
+          grid.appendChild(square(file, r, ch));
+          file++;
+        }
+      }
+    }
+
+    function square(fileIndex, rowIndex, piece) {
+      var dark = (fileIndex + rowIndex) % 2 === 1;
+      var cell = el('div', 'sq ' + (dark ? 'dark' : 'light'));
+      if (piece) {
+        var white = piece === piece.toUpperCase();
+        var kind = piece.toLowerCase();
+        var span = el('span', 'piece ' + (white ? 'w' : 'b'), GLYPH[kind]);
+        span.setAttribute('role', 'img');
+        span.setAttribute('aria-label', (white ? 'white ' : 'black ') + PIECE_NAME[kind] +
+          ' on ' + 'abcdefgh'.charAt(fileIndex) + (8 - rowIndex));
+        cell.appendChild(span);
+      }
+      return cell;
+    }
+
+    wrap.appendChild(grid);
+    var coords = el('div', 'board-files');
+    'abcdefgh'.split('').forEach(function (f) { coords.appendChild(el('span', null, f)); });
+    wrap.appendChild(coords);
+    return wrap;
+  }
 
   /* opts: { subject, topic, lesson, stage, mode: 'lesson' | 'practice', onExit } */
   function Lesson(root, opts) {
@@ -2278,8 +3096,16 @@ window.StudyHub = window.StudyHub || {};
     }
     this.checked = true;
     this.lastOk = right;
-    if (right) this.correct++;
-    else if (this.mode === 'lesson') this.hearts = SH.Progress.loseHeart();
+    if (right) {
+      this.correct++;
+      sfx('correct');
+    } else {
+      sfx('wrong');
+      if (this.mode === 'lesson') {
+        this.hearts = SH.Progress.loseHeart();
+        sfx('heart');
+      }
+    }
     this.draw();
   };
 
@@ -2306,12 +3132,14 @@ window.StudyHub = window.StudyHub || {};
     });
     if (this.mode === 'practice') SH.Progress.gainHeart();
 
+    sfx(passed ? (pct === 100 ? 'crown' : 'complete') : 'fail');
     this.renderResult(pct, passed, this.mode === 'practice' ? 5 : (passed ? xp : 0));
   };
 
   Lesson.prototype.outOfHearts = function () {
     this.finished = true;
     this.detach();
+    sfx('fail');
     var self = this;
     SH.Progress.finishLesson({
       subject: this.subject.id, topic: this.topic.id, lesson: this.lessonIndex,
@@ -2417,6 +3245,7 @@ window.StudyHub = window.StudyHub || {};
     /* --- question --- */
     var body = el('div', 'lesson-body');
     body.appendChild(el('div', 'kicker', q.kicker || this.topic.name));
+    if (q.board) body.appendChild(renderBoard(q.board));
     if (q.passage) body.appendChild(el('div', 'passage', q.passage));
 
     var promptCls = 'prompt' + (q.promptBig ? ' big' : '') + (isCjk(q.prompt) && q.promptBig ? ' script' : '');
@@ -2446,7 +3275,7 @@ window.StudyHub = window.StudyHub || {};
         }
         b.appendChild(el('span', 'key', LETTERS[i]));
         b.appendChild(el('span', null, text));
-        b.onclick = function () { self.picked = i; self.draw(); };
+        b.onclick = function () { self.picked = i; sfx('select'); self.draw(); };
         options.appendChild(b);
       });
       body.appendChild(options);
@@ -2525,7 +3354,7 @@ window.StudyHub = window.StudyHub || {};
       body.appendChild(el('div', 'kicker', subject.name + ' · ' + topic.name));
       var face = el('h2', 'prompt big' + (isCjk(c.front) ? ' script' : ''), c.front);
       face.style.cursor = 'pointer';
-      face.onclick = function () { flipped = !flipped; draw(); };
+      face.onclick = function () { flipped = !flipped; sfx('tap'); draw(); };
       body.appendChild(face);
       if (flipped) {
         body.appendChild(el('div', 'prompt', c.back));
@@ -2542,7 +3371,7 @@ window.StudyHub = window.StudyHub || {};
       prev.onclick = function () { i = (i - 1 + cards.length) % cards.length; flipped = false; draw(); };
       var flip = el('button', 'btn btn--blue', flipped ? 'Hide' : 'Reveal');
       flip.type = 'button';
-      flip.onclick = function () { flipped = !flipped; draw(); };
+      flip.onclick = function () { flipped = !flipped; sfx('tap'); draw(); };
       var next = el('button', 'btn', 'Next');
       next.type = 'button';
       next.onclick = function () { i = (i + 1) % cards.length; flipped = false; draw(); };
@@ -2615,6 +3444,10 @@ window.StudyHub = window.StudyHub || {};
     bar.appendChild(el('span', 'stat-pill heart', '❤️ ' + data.hearts.n));
     bar.appendChild(btn('icon-btn', '📊', function () { go('stats'); }));
     bar.appendChild(btn('icon-btn', '👤', function () { go('profile'); }));
+    bar.appendChild(btn('icon-btn', SH.Sfx.muted() ? '🔇' : '🔊', function () {
+      SH.Sfx.toggle();
+      render();
+    }));
     bar.appendChild(btn('icon-btn', document.documentElement.getAttribute('data-theme') === 'dark' ? '☀️' : '🌙',
       function () { SH.Theme.toggle(); render(); }));
     hudEl.appendChild(bar);
@@ -2782,9 +3615,10 @@ window.StudyHub = window.StudyHub || {};
     head.appendChild(h);
     wrap.appendChild(head);
 
-    subject.topics.forEach(function (topic, unitIndex) {
+    var topics = subject.topics.filter(function (t) { return (t.minStage || 0) <= st; });
+    topics.forEach(function (topic, unitIndex) {
       var crowns = SH.Progress.crowns(subject.id, topic.id);
-      var prevComplete = unitIndex === 0 || SH.Progress.unitComplete(subject.id, subject.topics[unitIndex - 1].id);
+      var prevComplete = unitIndex === 0 || SH.Progress.unitComplete(subject.id, topics[unitIndex - 1].id);
 
       var unit = el('div', 'unit');
       unit.style.setProperty('--sub', subject.color);
@@ -2817,6 +3651,7 @@ window.StudyHub = window.StudyHub || {};
             row.style.marginTop = '24px';   // room for the flag above the node
           }
           node.onclick = function () {
+            SH.Sfx.play('tap');
             if (!open) return lockedModal(subject, topic, lessonIndex);
             startLesson(subject, topic, lessonIndex, done ? 'practice' : 'lesson');
           };
@@ -2965,7 +3800,7 @@ window.StudyHub = window.StudyHub || {};
     wrap.lastChild.appendChild(el('h2', null, 'What you are studying'));
     var rows = el('div', 'rows');
     SH.subjects.forEach(function (s) {
-      s.topics.forEach(function (t) {
+      s.topics.filter(function (t) { return (t.minStage || 0) <= p.stageIndex; }).forEach(function (t) {
         var row = el('div', 'row');
         var main = el('div', 'row-main');
         main.appendChild(el('div', 'row-title', s.emoji + '  ' + t.name));

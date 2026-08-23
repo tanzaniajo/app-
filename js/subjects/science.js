@@ -5,6 +5,10 @@
 
   /* Each item: [question, [options — first one is correct], explanation] */
   var BIOLOGY = [
+    ['What is the role of ribosomes?', ['They build proteins from amino acids', 'They store DNA', 'They release energy', 'They digest waste'], 'Ribosomes read mRNA and assemble the protein it codes for.', 3],
+    ['Which molecule carries the code from DNA to the ribosome?', ['mRNA', 'ATP', 'Glucose', 'Haemoglobin'], 'Messenger RNA is transcribed from DNA and travels out of the nucleus.', 3],
+    ['Roughly how much energy passes from one level of a food chain to the next?', ['About 10% — most is lost as heat', '100%', 'About 90%', 'None'], 'That loss is why food chains rarely have more than four or five levels.', 3],
+    ['What is homeostasis?', ['Keeping internal conditions stable', 'Copying DNA before division', 'Building new proteins', 'Fighting infection'], 'Temperature, blood sugar and water balance are all held within narrow limits.', 3],
     ['Which of these is a living thing?', ['A tree', 'A rock', 'A cloud', 'A spoon'], 'Living things grow, feed and reproduce. A tree does; a rock does not.', 1],
     ['What do humans breathe in to stay alive?', ['Oxygen', 'Carbon dioxide', 'Helium', 'Smoke'], 'We take oxygen from the air into our lungs.', 1],
     ['Which body part do you use to smell?', ['Nose', 'Ear', 'Elbow', 'Knee'], 'The nose contains cells that detect smells.', 1],
@@ -98,6 +102,9 @@
   ];
 
   var EARTH = [
+    ['Radiometric dating works by measuring...', ['The decay of unstable isotopes in rock', 'The thickness of the soil above', 'The height of nearby mountains', 'The salinity of the ocean'], 'Known half-lives turn isotope ratios into an age.', 3],
+    ['The Moon always shows Earth the same face because...', ['Its rotation and its orbit take the same time', 'It does not rotate at all', 'Earth blocks the far side', 'It is too distant to see turning'], 'This is called tidal locking.', 3],
+    ['Sea-floor spreading is strong evidence for...', ['Plate tectonics', 'A shrinking Earth', 'A completely fixed crust', 'A young Earth'], 'Magnetic stripes either side of mid-ocean ridges record the spreading.', 3],
     ['Which object gives the Earth its light and heat?', ['The Sun', 'The Moon', 'A star called Sirius', 'A comet'], 'The Sun is our nearest star.', 1],
     ['How many days are there in a week?', ['7', '5', '10', '12'], 'A week has seven days.', 1],
     ['What falls from clouds as rain?', ['Water', 'Sand', 'Rocks', 'Air'], 'Clouds hold tiny water droplets that join and fall as rain.', 1],
@@ -129,6 +136,10 @@
   ];
 
   var METHOD = [
+    ['What is a prediction?', ['A sensible statement of what you think will happen', 'The final result', 'A measurement you took', 'A drawing of the equipment'], 'You make it before the experiment, so the experiment can test it.', 1],
+    ['Why do scientists wear goggles in a practical?', ['To protect their eyes', 'To see small things better', 'To look the part', 'To measure light levels'], 'Safety equipment is part of planning any experiment.', 1],
+    ['What is a double-blind trial?', ['Neither the participants nor the researchers know who received the treatment', 'Nobody writes down the results', 'Only one group is tested', 'The experiment is run twice'], 'It removes expectation effects from both sides at once.', 3],
+    ['A confounding variable is one that...', ['Changes along with what you are testing, muddling the result', 'Is deliberately held constant', 'Has no effect on anything', 'Is measured twice for accuracy'], 'Randomisation is the usual defence against confounders.', 3],
     ['Before you start an experiment you should...', ['Predict what you think will happen', 'Write the conclusion first', 'Change every variable', 'Throw away the equipment'], 'A prediction gives you something to test.', 1],
     ['Which tool would you use to measure temperature?', ['A thermometer', 'A ruler', 'A stopwatch', 'A balance'], 'Thermometers measure how hot or cold something is.', 1],
     ['If you measure something three times, you should...', ['Compare the results and look for odd ones', 'Only keep the biggest', 'Only keep the smallest', 'Ignore them all'], 'Repeats help you spot mistakes.', 1],

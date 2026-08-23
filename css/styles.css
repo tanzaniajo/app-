@@ -30,6 +30,7 @@
   --math: #ff9600;
   --science: #58cc02;
   --chinese: #ff4b4b;
+  --chess: #ce82ff;
 
   --radius: 16px;
   /* system rounded stack: no network fetch, so the app works fully offline */
@@ -400,4 +401,28 @@ button { font-family: inherit; }
   .prompt.script { font-size: 3rem; }
   .footbar .btn { width: 100%; }
   .node { width: 64px; height: 60px; font-size: 1.3rem; }
+}
+
+/* ---------------- chess board ---------------- */
+.board-wrap { margin: 0 auto 20px; width: min(340px, 82vw); }
+.board {
+  display: grid; grid-template-columns: repeat(8, 1fr);
+  border-radius: 10px; overflow: hidden;
+  box-shadow: 0 3px 0 rgba(0,0,0,.25);
+}
+.board .sq {
+  aspect-ratio: 1 / 1; display: grid; place-items: center;
+  font-size: clamp(19px, 5.8vw, 31px); line-height: 1;
+}
+.board .sq.light { background: #f0d9b5; }
+.board .sq.dark  { background: #b58863; }
+.board .piece.w {
+  color: #fff;
+  text-shadow: 0 1px 0 #2b2b2b, 0 -1px 0 #2b2b2b, 1px 0 0 #2b2b2b, -1px 0 0 #2b2b2b;
+}
+.board .piece.b { color: #1a1a1a; text-shadow: 0 0 2px rgba(255,255,255,.30); }
+.board-files {
+  display: grid; grid-template-columns: repeat(8, 1fr);
+  font-size: .68rem; font-weight: 800; color: var(--text-dim);
+  text-align: center; padding-top: 4px;
 }

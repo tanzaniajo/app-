@@ -14,6 +14,53 @@
     return String(s).trim().toLowerCase().replace(/\s+/g, ' ').replace(/[.,!?;:]+$/, '');
   }
   function isCjk(s) { return /[㐀-鿿]/.test(s); }
+  function sfx(name) { if (SH.Sfx) SH.Sfx.play(name); }
+
+  /* Draw a position from a FEN string. Filled glyphs are used for both sides and
+     coloured with CSS, because outline glyphs render inconsistently across fonts. */
+  var GLYPH = { k: '\u265A', q: '\u265B', r: '\u265C', b: '\u265D', n: '\u265E', p: '\u265F' };
+  var PIECE_NAME = { k: 'king', q: 'queen', r: 'rook', b: 'bishop', n: 'knight', p: 'pawn' };
+
+  function renderBoard(fen) {
+    var rows = fen.split(' ')[0].split('/');
+    var wrap = el('div', 'board-wrap');
+    var grid = el('div', 'board');
+
+    for (var r = 0; r < 8; r++) {
+      var file = 0;
+      var chars = rows[r].split('');
+      for (var c = 0; c < chars.length; c++) {
+        var ch = chars[c];
+        if (/\d/.test(ch)) {
+          for (var k = 0; k < +ch; k++) { grid.appendChild(square(file, r, null)); file++; }
+        } else {
+          grid.appendChild(square(file, r, ch));
+          file++;
+        }
+      }
+    }
+
+    function square(fileIndex, rowIndex, piece) {
+      var dark = (fileIndex + rowIndex) % 2 === 1;
+      var cell = el('div', 'sq ' + (dark ? 'dark' : 'light'));
+      if (piece) {
+        var white = piece === piece.toUpperCase();
+        var kind = piece.toLowerCase();
+        var span = el('span', 'piece ' + (white ? 'w' : 'b'), GLYPH[kind]);
+        span.setAttribute('role', 'img');
+        span.setAttribute('aria-label', (white ? 'white ' : 'black ') + PIECE_NAME[kind] +
+          ' on ' + 'abcdefgh'.charAt(fileIndex) + (8 - rowIndex));
+        cell.appendChild(span);
+      }
+      return cell;
+    }
+
+    wrap.appendChild(grid);
+    var coords = el('div', 'board-files');
+    'abcdefgh'.split('').forEach(function (f) { coords.appendChild(el('span', null, f)); });
+    wrap.appendChild(coords);
+    return wrap;
+  }
 
   /* opts: { subject, topic, lesson, stage, mode: 'lesson' | 'practice', onExit } */
   function Lesson(root, opts) {
@@ -74,8 +121,16 @@
     }
     this.checked = true;
     this.lastOk = right;
-    if (right) this.correct++;
-    else if (this.mode === 'lesson') this.hearts = SH.Progress.loseHeart();
+    if (right) {
+      this.correct++;
+      sfx('correct');
+    } else {
+      sfx('wrong');
+      if (this.mode === 'lesson') {
+        this.hearts = SH.Progress.loseHeart();
+        sfx('heart');
+      }
+    }
     this.draw();
   };
 
@@ -102,12 +157,14 @@
     });
     if (this.mode === 'practice') SH.Progress.gainHeart();
 
+    sfx(passed ? (pct === 100 ? 'crown' : 'complete') : 'fail');
     this.renderResult(pct, passed, this.mode === 'practice' ? 5 : (passed ? xp : 0));
   };
 
   Lesson.prototype.outOfHearts = function () {
     this.finished = true;
     this.detach();
+    sfx('fail');
     var self = this;
     SH.Progress.finishLesson({
       subject: this.subject.id, topic: this.topic.id, lesson: this.lessonIndex,
@@ -213,6 +270,7 @@
     /* --- question --- */
     var body = el('div', 'lesson-body');
     body.appendChild(el('div', 'kicker', q.kicker || this.topic.name));
+    if (q.board) body.appendChild(renderBoard(q.board));
     if (q.passage) body.appendChild(el('div', 'passage', q.passage));
 
     var promptCls = 'prompt' + (q.promptBig ? ' big' : '') + (isCjk(q.prompt) && q.promptBig ? ' script' : '');
@@ -242,7 +300,7 @@
         }
         b.appendChild(el('span', 'key', LETTERS[i]));
         b.appendChild(el('span', null, text));
-        b.onclick = function () { self.picked = i; self.draw(); };
+        b.onclick = function () { self.picked = i; sfx('select'); self.draw(); };
         options.appendChild(b);
       });
       body.appendChild(options);
@@ -321,7 +379,7 @@
       body.appendChild(el('div', 'kicker', subject.name + ' · ' + topic.name));
       var face = el('h2', 'prompt big' + (isCjk(c.front) ? ' script' : ''), c.front);
       face.style.cursor = 'pointer';
-      face.onclick = function () { flipped = !flipped; draw(); };
+      face.onclick = function () { flipped = !flipped; sfx('tap'); draw(); };
       body.appendChild(face);
       if (flipped) {
         body.appendChild(el('div', 'prompt', c.back));
@@ -338,7 +396,7 @@
       prev.onclick = function () { i = (i - 1 + cards.length) % cards.length; flipped = false; draw(); };
       var flip = el('button', 'btn btn--blue', flipped ? 'Hide' : 'Reveal');
       flip.type = 'button';
-      flip.onclick = function () { flipped = !flipped; draw(); };
+      flip.onclick = function () { flipped = !flipped; sfx('tap'); draw(); };
       var next = el('button', 'btn', 'Next');
       next.type = 'button';
       next.onclick = function () { i = (i + 1) % cards.length; flipped = false; draw(); };

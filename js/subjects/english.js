@@ -177,6 +177,10 @@
 
   /* [idiom, meaning, band] */
   var IDIOMS = [
+    ['hit the nail on the head', 'to describe something exactly right', 2],
+    ['out of the blue', 'completely unexpectedly', 2],
+    ['a blessing in disguise', 'something that seems bad but turns out well', 3],
+    ['burn the midnight oil', 'to work or study late into the night', 3],
     ['piece of cake', 'something very easy to do', 1],
     ['break the ice', 'to make people feel relaxed when they first meet', 1],
     ['under the weather', 'feeling slightly ill', 1],

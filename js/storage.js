@@ -95,12 +95,19 @@ window.StudyHub = window.StudyHub || {};
       return write(d).hearts.n;
     },
 
-    /* ---- lessons ---- */
-    lessonKey: function (s, t, i) { return s + '/' + t + '/' + i; },
-    lesson: function (s, t, i) { return Progress.all().lessons[s + '/' + t + '/' + i] || null; },
+    /* ---- lessons ----
+       Keys carry the syllabus stage, because a lesson cleared as a nine-year-old
+       is not the same lesson as an adult sees. Changing your age therefore gives
+       you a fresh path, and changing back restores the one you had. */
+    stageId: function () {
+      var p = Profile.get();
+      return p ? p.stage.id : 'middle';
+    },
+    lessonKey: function (s, t, i) { return Progress.stageId() + '/' + s + '/' + t + '/' + i; },
+    lesson: function (s, t, i) { return Progress.all().lessons[Progress.lessonKey(s, t, i)] || null; },
     crowns: function (s, t) {
       var d = Progress.all(), n = 0;
-      for (var i = 0; i < LESSONS_PER_UNIT; i++) if (d.lessons[s + '/' + t + '/' + i]) n++;
+      for (var i = 0; i < LESSONS_PER_UNIT; i++) if (d.lessons[Progress.lessonKey(s, t, i)]) n++;
       return n;
     },
     unitComplete: function (s, t) { return Progress.crowns(s, t) >= LESSONS_PER_UNIT; },
@@ -109,7 +116,7 @@ window.StudyHub = window.StudyHub || {};
     finishLesson: function (opts) {
       var d = Progress.all();
       var key = opts.subject + '/' + opts.topic;
-      var lessonKey = key + '/' + opts.lesson;
+      var lessonKey = Progress.lessonKey(opts.subject, opts.topic, opts.lesson);
       var pct = opts.asked ? Math.round((opts.correct / opts.asked) * 100) : 0;
 
       if (opts.passed) {
@@ -148,8 +155,9 @@ window.StudyHub = window.StudyHub || {};
         out.correct += d.topics[k].correct;
         out.sessions += d.topics[k].sessions;
       });
+      var prefix = Progress.stageId() + '/' + subjectId + '/';
       Object.keys(d.lessons).forEach(function (k) {
-        if (k.indexOf(subjectId + '/') === 0) out.crowns++;
+        if (k.indexOf(prefix) === 0) out.crowns++;
       });
       return out;
     },
@@ -252,22 +260,41 @@ window.StudyHub = window.StudyHub || {};
       }
       return out;
     },
-    /* Keep only bank items whose difficulty band suits the learner's stage.
-       Bank items carry their band as the last element of the tuple. If the
-       stage's own bands hold too little, widen downwards so nothing is empty. */
+    /* Choose the bank items that suit a learner's stage.
+
+       Items carry their difficulty band as the last element of the tuple. We take
+       everything in the stage's own bands; only if that is too thin do we reach for
+       the NEAREST band outwards, one step at a time. Never dump the whole bank —
+       that is how a seven-year-old ends up with GCSE questions, and a
+       seventeen-year-old with "which animal is a mammal". */
     forStage: function (bank, stageIndex) {
       var stage = STAGES[stageIndex == null ? 2 : stageIndex];
       var want = stage.bands;
+      var MIN = 8;
+
       function bandOf(it) {
         var b = it[it.length - 1];
         return typeof b === 'number' ? b : 2;
       }
-      var inStage = bank.filter(function (it) { return want.indexOf(bandOf(it)) !== -1; });
-      if (inStage.length >= 8) return inStage;
-      var ceiling = Math.max.apply(null, want);
-      var widened = bank.filter(function (it) { return bandOf(it) <= ceiling; });
-      return widened.length ? widened : bank;
+      function distance(it) {
+        var b = bandOf(it), d = Infinity;
+        for (var i = 0; i < want.length; i++) d = Math.min(d, Math.abs(b - want[i]));
+        return d;
+      }
+
+      var buckets = [];
+      bank.forEach(function (it) {
+        var d = distance(it);
+        (buckets[d] = buckets[d] || []).push(it);
+      });
+
+      var out = [];
+      for (var d = 0; d < buckets.length && out.length < MIN; d++) {
+        if (buckets[d]) out = out.concat(buckets[d]);
+      }
+      return out.length ? out : bank;
     },
+
     /* Multiple choice from a correct value plus a pool of distractors. */
     choice: function (prompt, correct, pool, extra) {
       var seen = {}; seen[String(correct)] = true;

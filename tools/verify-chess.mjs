@@ -70,5 +70,28 @@ for (const p of PUZZLES) {
   }
 }
 
+/* ---------- the opening book ----------
+   A typo in a line means it can never match a real game, so play every line
+   through the engine and check each move is legal from the position before it. */
+const Openings = require(join(here, '..', 'js', 'chess-openings.js'));
+let bookBad = 0;
+for (const [line, name] of Openings.BOOK) {
+  const state = Chess.create();
+  const moves = line.split(' ');
+  for (let i = 0; i < moves.length; i++) {
+    const move = Chess.findMove(state, moves[i]);
+    if (!move) {
+      bookBad++;
+      console.log(`  ✗ ${name}: "${moves[i]}" is not legal after ${moves.slice(0, i).join(' ') || 'the start'}`);
+      break;
+    }
+    Chess.make(state, move);
+  }
+}
+console.log(bookBad
+  ? `\n${bookBad} opening line(s) are not playable`
+  : `Opening book: all ${Openings.BOOK.length} lines are legal sequences.`);
+failures += bookBad;
+
 console.log(failures ? `\n${failures} problem(s) found` : `\nAll ${PUZZLES.length} puzzles verified.`);
 process.exit(failures ? 1 : 0);

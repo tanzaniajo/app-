@@ -125,7 +125,11 @@
       awarded: false,
       promo: null,          // { from, to, options } while the picker is open
       premove: null,        // { from, to } queued while the bot thinks
-      anim: null            // { from, to, rookFrom, rookTo } to animate on the next draw
+      anim: null,           // { from, to, rookFrom, rookTo } to animate on the next draw
+      arrows: [],           // [from, to] pairs drawn by right-dragging
+      circles: [],          // squares ringed by right-clicking
+      annotate: false,      // touch users toggle this to draw without a right button
+      dragFrom: -1
     };
 
     function botColor() { return game.player === 'w' ? 'b' : 'w'; }
@@ -162,6 +166,8 @@
     }
 
     function applyMove(move) {
+      game.arrows = [];
+      game.circles = [];
       var text = Chess.san(game.state, move);
       game.anim = { from: move.from, to: move.to };
       if (move.castle) {
@@ -320,6 +326,35 @@
 
     /* ------------------------------ rendering ------------------------------ */
 
+    var FULL_SET = { q: 1, r: 2, b: 2, n: 2, p: 8 };
+    var ORDER = ['q', 'r', 'b', 'n', 'p'];
+
+    /* What each side has captured, worked out from what is missing off the board. */
+    function captured() {
+      var left = { w: {}, b: {} };
+      ORDER.forEach(function (k) { left.w[k] = 0; left.b[k] = 0; });
+      for (var sq = 0; sq < 64; sq++) {
+        var piece = game.state.board[sq];
+        if (piece === 0) continue;
+        var kind = piece.toLowerCase();
+        if (kind === 'k') continue;
+        left[Chess.isWhitePiece(piece) ? 'w' : 'b'][kind]++;
+      }
+      var out = { w: [], b: [], edge: { w: 0, b: 0 } };
+      ['w', 'b'].forEach(function (side) {
+        var taker = side === 'w' ? 'b' : 'w';       // pieces missing from `side` were taken by the other
+        ORDER.forEach(function (kind) {
+          var gone = FULL_SET[kind] - left[side][kind];
+          for (var i = 0; i < gone; i++) out[taker].push(kind);
+          out.edge[taker] += gone * AI.VALUE[kind];
+        });
+      });
+      // promotions can leave more of a piece than the set started with
+      out.w = out.w.slice(0, 15);
+      out.b = out.b.slice(0, 15);
+      return out;
+    }
+
     function materialEdge() {
       var score = { w: 0, b: 0 };
       for (var sq = 0; sq < 64; sq++) {
@@ -330,6 +365,98 @@
         score[Chess.isWhitePiece(p) ? 'w' : 'b'] += AI.VALUE[k];
       }
       return Math.round((score[game.player] - score[botColor()]) / 100);
+    }
+
+    /* One side's captured pieces, plus the points they are ahead by. */
+    function capturedStrip(side, label) {
+      var taken = captured()[side];
+      var edge = materialEdge();
+      var ahead = side === game.player ? edge : -edge;
+
+      var strip = el('div', 'captured');
+      strip.appendChild(el('span', 'captured-who', label));
+      var icons = el('span', 'captured-icons');
+      taken.forEach(function (kind) {
+        var art = el('span', 'cap-piece');
+        // show the pieces this side has taken, so they are the opponent's colour
+        art.innerHTML = Pieces.svg(side === 'w' ? kind : kind.toUpperCase());
+        icons.appendChild(art);
+      });
+      strip.appendChild(icons);
+      if (ahead > 0) strip.appendChild(el('span', 'captured-edge', '+' + ahead));
+      return strip;
+    }
+
+    /* Where a square sits on screen, in board units (0-8), for the arrow overlay. */
+    function squareXY(sq) {
+      var flipped = game.player === 'b';
+      var rank = Chess.rankOf(sq), file = Chess.fileOf(sq);
+      var row = flipped ? rank : 7 - rank;
+      var col = flipped ? 7 - file : file;
+      return { x: col + 0.5, y: row + 0.5 };
+    }
+
+    function svgEl(tag, attrs) {
+      var node = document.createElementNS('http://www.w3.org/2000/svg', tag);
+      for (var k in attrs) node.setAttribute(k, attrs[k]);
+      return node;
+    }
+
+    /* An arrow is a shaft that stops short of the target plus a triangular head,
+       drawn in board units so it scales with the board. */
+    function drawArrows() {
+      var svg = svgEl('svg', { class: 'board-shapes', viewBox: '0 0 8 8', preserveAspectRatio: 'none' });
+
+      game.circles.forEach(function (sq) {
+        var c = squareXY(sq);
+        svg.appendChild(svgEl('circle', {
+          cx: c.x, cy: c.y, r: 0.44, fill: 'none',
+          stroke: 'rgba(255,170,0,.9)', 'stroke-width': 0.09
+        }));
+      });
+
+      game.arrows.forEach(function (pair) {
+        var f = squareXY(pair[0]), t = squareXY(pair[1]);
+        var dx = t.x - f.x, dy = t.y - f.y;
+        var len = Math.sqrt(dx * dx + dy * dy);
+        if (!len) return;
+        var ux = dx / len, uy = dy / len;
+        var head = 0.36, halfWidth = 0.23;
+        var baseX = t.x - ux * head, baseY = t.y - uy * head;
+        var startX = f.x + ux * 0.22, startY = f.y + uy * 0.22;
+
+        svg.appendChild(svgEl('line', {
+          x1: startX, y1: startY, x2: baseX, y2: baseY,
+          stroke: 'rgba(255,170,0,.85)', 'stroke-width': 0.16, 'stroke-linecap': 'round'
+        }));
+        svg.appendChild(svgEl('polygon', {
+          points: [
+            t.x + ',' + t.y,
+            (baseX - uy * halfWidth) + ',' + (baseY + ux * halfWidth),
+            (baseX + uy * halfWidth) + ',' + (baseY - ux * halfWidth)
+          ].join(' '),
+          fill: 'rgba(255,170,0,.85)'
+        }));
+      });
+
+      return svg;
+    }
+
+    function clearShapes() {
+      if (!game.arrows.length && !game.circles.length) return false;
+      game.arrows = [];
+      game.circles = [];
+      return true;
+    }
+
+    function toggleArrow(from, to) {
+      var i = game.arrows.findIndex(function (a) { return a[0] === from && a[1] === to; });
+      if (i >= 0) game.arrows.splice(i, 1); else game.arrows.push([from, to]);
+    }
+
+    function toggleCircle(sq) {
+      var i = game.circles.indexOf(sq);
+      if (i >= 0) game.circles.splice(i, 1); else game.circles.push(sq);
     }
 
     function drawBoard() {
@@ -373,10 +500,47 @@
           if (row === 7) cell.appendChild(el('span', 'coord file', 'abcdefgh'.charAt(file)));
 
           cells[sq] = cell;
-          (function (square) { cell.onclick = function () { selectSquare(square); }; })(sq);
+          cell.dataset.sq = sq;
+          (function (square) {
+            cell.onclick = function () {
+              if (game.annotate) return;          // in annotate mode taps draw, not move
+              // a click wipes any marks AND still does what it would normally do,
+              // rather than costing you a click
+              var hadMarks = clearShapes();
+              if (game.over || game.promo) { if (hadMarks) draw(); return; }
+              selectSquare(square);
+            };
+          })(sq);
           grid.appendChild(cell);
         }
       }
+      grid.appendChild(drawArrows());
+
+      /* Right-drag from one square to another draws an arrow; a right-click on a
+         single square rings it. Touch devices have no right button, so the same
+         gestures work with the left button once annotate mode is on. */
+      grid.oncontextmenu = function (e) { e.preventDefault(); };
+      grid.onpointerdown = function (e) {
+        if (e.button !== 2 && !game.annotate) return;
+        var cell = e.target.closest ? e.target.closest('.sq') : null;
+        if (!cell) return;
+        e.preventDefault();
+        game.dragFrom = +cell.dataset.sq;
+      };
+      grid.onpointerup = function (e) {
+        if (game.dragFrom < 0) return;
+        if (e.button !== 2 && !game.annotate) { game.dragFrom = -1; return; }
+        var cell = e.target.closest ? e.target.closest('.sq') : null;
+        var from = game.dragFrom;
+        game.dragFrom = -1;
+        if (!cell) return;
+        e.preventDefault();
+        var to = +cell.dataset.sq;
+        if (from === to) toggleCircle(to); else toggleArrow(from, to);
+        sfx('tap');
+        draw();
+      };
+
       wrap.appendChild(grid);
 
       /* Slide the piece that just moved. The board has already been rebuilt in its
@@ -450,8 +614,15 @@
       root.appendChild(top);
 
       var body = el('div', 'lesson-body');
-      body.appendChild(el('div', 'kicker', 'you play ' + (game.player === 'w' ? 'white' : 'black')));
+      body.appendChild(capturedStrip(botColor(), 'Bot'));
       body.appendChild(drawBoard());
+      body.appendChild(capturedStrip(game.player, 'You'));
+
+      var opening = SH.ChessOpenings.identify(game.history.map(function (h) { return h.san; }));
+      var openingLine = el('div', 'opening-line');
+      openingLine.appendChild(el('span', 'opening-label', 'Opening'));
+      openingLine.appendChild(el('span', 'opening-name', opening ? opening.name : '—'));
+      body.appendChild(openingLine);
 
       var status = el('div', 'play-status' + (game.over ? ' over' : ''));
       status.appendChild(el('strong', null, statusLine()));
@@ -475,6 +646,21 @@
         actions.appendChild(btn('btn btn--ghost', 'Undo', undoMove));
         actions.appendChild(btn('btn btn--ghost', 'Resign', resign));
         actions.appendChild(btn('btn btn--ghost', 'New game', function () { renderPicker(root, onExit); }));
+        var arrowBtn = btn('btn btn--ghost' + (game.annotate ? ' on' : ''),
+          game.annotate ? '✏️ Drawing' : '✏️ Arrows', function () {
+            game.annotate = !game.annotate;
+            game.selected = -1;
+            game.targets = [];
+            sfx('tap');
+            draw();
+          });
+        arrowBtn.title = 'Right-drag on the board draws arrows; turn this on to draw by tapping';
+        actions.appendChild(arrowBtn);
+        if (game.arrows.length || game.circles.length) {
+          actions.appendChild(btn('btn btn--ghost', 'Clear marks', function () {
+            clearShapes(); sfx('tap'); draw();
+          }));
+        }
         body.appendChild(actions);
       }
 

@@ -49,6 +49,17 @@ algebraic notation. Promotion, castling, en passant, undo and resign all work, a
 every drawing rule is reported properly — stalemate, threefold repetition, the
 fifty-move rule and insufficient material.
 
+**What you can see while you play.** The opening is named as you go — 84 lines, from
+"King's Pawn Opening" down to the Najdorf and the Berlin — matched by the longest
+sequence that fits, and kept once you leave the book, because a game is still "a
+Sicilian" on move 30. Beside each side sits the pieces it has captured and how many
+points it is ahead by.
+
+**Arrows.** Right-drag from one square to another to draw an arrow, right-click a
+single square to ring it. Drawing the same arrow again removes it; a left click or a
+move clears them. Touch devices have no right button, so the **Arrows** button turns
+on a drawing mode where the same gestures work with a normal tap.
+
 **Premoves.** While the bot is thinking you can already play your reply: tap a piece
 and a square and it is queued, shown in blue with a Cancel next to it. It is played
 the instant the bot moves, or quietly dropped if the bot's move made it illegal. For
@@ -144,6 +155,7 @@ css/styles.css        design tokens, components, light + dark themes, the board
 js/storage.js         profile, XP, hearts, streak, lesson progress, shared helpers
 js/audio.js           synthesised sound effects
 js/chess-pieces.js    the piece artwork, drawn as SVG
+js/chess-openings.js  opening names, matched by longest move sequence
 js/chess-engine.js    full chess rules, shared by the game and the tests
 js/chess-ai.js        the opponent: search, evaluation, strength levels
 js/play.js            the chess game screen
@@ -169,7 +181,9 @@ against published values — 4,085,603 nodes at depth 4 on Kiwipete, and so on. 
 mistake anywhere in castling, en passant, promotion or pinned pieces changes the count,
 so a clean run means move generation is exact.
 
-`verify-chess.mjs` uses that same engine to check the puzzles in the course: the
+`verify-chess.mjs` also plays every line of the opening book through the engine, since
+a typo in a line would mean it silently never matches. It uses that same engine to
+check the puzzles in the course: the
 answer really is mate, no distractor is also mate, the solution is unique, and the
 notation shown matches what the engine calls the move. It has caught two real errors
 so far — a position where the white king blocked its own queen's path, and a move
